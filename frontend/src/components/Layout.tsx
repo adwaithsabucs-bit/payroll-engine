@@ -3,8 +3,9 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Users, ClipboardList, DollarSign,
-  LogOut, HardHat, User, ChevronRight
+  LogOut, HardHat, User as UserIcon,
 } from 'lucide-react';
+import logo from '../logo.svg';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const { user, logout } = useAuth();
@@ -17,16 +18,43 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   };
 
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['HR'] },
-    { path: '/workforce', label: 'Workforce', icon: Users, roles: ['HR', 'SUPERVISOR', 'CONTRACTOR'] },
-    { path: '/attendance', label: 'Attendance', icon: ClipboardList, roles: ['HR', 'SUPERVISOR', 'CONTRACTOR', 'LABOURER'] },
-    { path: '/payroll', label: 'Payroll', icon: DollarSign, roles: ['HR', 'SUPERVISOR', 'CONTRACTOR', 'LABOURER'] },
+    {
+      path: '/dashboard',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+      roles: ['HR'],
+    },
+    {
+      path: '/users',
+      label: 'Users',
+      icon: Users,
+      roles: ['HR'],
+    },
+    {
+      path: '/workforce',
+      label: 'Workforce',
+      icon: HardHat,
+      roles: ['HR', 'SUPERVISOR', 'CONTRACTOR'],
+    },
+    {
+      path: '/attendance',
+      label: 'Attendance',
+      icon: ClipboardList,
+      roles: ['HR', 'SUPERVISOR', 'CONTRACTOR', 'LABOURER'],
+    },
+    {
+      path: '/payroll',
+      label: 'Payroll',
+      icon: DollarSign,
+      roles: ['HR', 'SUPERVISOR', 'CONTRACTOR', 'LABOURER'],
+    },
   ];
 
   const visibleItems = navItems.filter(item => user && item.roles.includes(user.role));
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif' }}>
+
       {/* Sidebar */}
       <aside style={{
         width: 240,
@@ -34,20 +62,24 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         color: 'white',
         display: 'flex',
         flexDirection: 'column',
-        padding: '0',
         flexShrink: 0,
       }}>
+
         {/* Logo */}
         <div style={{ padding: '24px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              background: '#f59e0b',
-              borderRadius: 8,
-              padding: 8,
-              display: 'flex',
-            }}>
-              <HardHat size={20} color="white" />
-            </div>
+            <img
+              src={logo}
+              alt="Logo"
+              style={{
+                width: 42,
+                height: 42,
+                objectFit: 'contain',
+                borderRadius: '50%',
+                background: 'white',
+                padding: 2,
+              }}
+            />
             <div>
               <div style={{ fontWeight: 700, fontSize: 16 }}>PayrollEngine</div>
               <div style={{ fontSize: 11, color: '#94a3b8' }}>Construction Wages</div>
@@ -88,7 +120,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         </nav>
 
         {/* User info & logout */}
-        <div style={{ padding: '16px 12px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ padding: '16px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -103,16 +135,21 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               background: '#f59e0b',
               borderRadius: '50%',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
             }}>
-              <User size={16} color="white" />
+              <UserIcon size={16} color="white" />
             </div>
             <div style={{ flex: 1, overflow: 'hidden' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{
+                fontSize: 13, fontWeight: 600, color: 'white',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
                 {user?.first_name || user?.username}
               </div>
               <div style={{ fontSize: 11, color: '#94a3b8' }}>{user?.role}</div>
             </div>
           </div>
+
           <button
             onClick={handleLogout}
             style={{
@@ -133,6 +170,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             Sign Out
           </button>
         </div>
+
       </aside>
 
       {/* Main content */}
@@ -141,6 +179,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           {children}
         </div>
       </main>
+
     </div>
   );
 };

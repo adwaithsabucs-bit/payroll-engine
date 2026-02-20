@@ -3,7 +3,7 @@ import { getPayrolls, getPeriods, createPeriod, generatePayroll, approvePayroll 
 import { Payroll, PayrollPeriod } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Plus, RefreshCw } from 'lucide-react';
-
+import { extractResults } from '../utils/pagination';
 const STATUS_COLORS: Record<string, string> = {
   PENDING: '#f59e0b',
   APPROVED: '#3b82f6',
@@ -24,12 +24,16 @@ const PayrollPage = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [payRes, perRes] = await Promise.all([
-        getPayrolls(selectedPeriod ? { period: selectedPeriod } : {}),
-        user?.role === 'HR' ? getPeriods() : Promise.resolve({ data: { results: [] } }),
-      ]);
-      setPayrolls(payRes.data.results || payRes.data);
-      setPeriods(perRes.data.results || perRes.data);
+      const params = selectedPeriod ? { period: selectedPeriod } : {};
+      const payRes = await getPayrolls(params);
+      setPayrolls(extractResults<Payroll>(payRes.data));
+
+      if (user?.role === 'HR') {
+        const perRes = await getPeriods();
+        setPeriods(extractResults<PayrollPeriod>(perRes.data));
+      }
+    } catch (err) {
+      console.error('Failed to fetch payroll data:', err);
     } finally {
       setLoading(false);
     }

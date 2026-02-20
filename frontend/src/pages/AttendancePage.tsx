@@ -4,7 +4,7 @@ import { getLabourers } from '../api/workforce';
 import { Attendance, Labourer } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { CheckCircle, XCircle, Clock, Plus } from 'lucide-react';
-
+import { extractResults } from '../utils/pagination';
 const STATUS_COLORS: Record<string, string> = {
   PRESENT: '#10b981',
   ABSENT: '#ef4444',
@@ -38,12 +38,15 @@ const AttendancePage = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [attRes, labRes] = await Promise.all([
-        getAttendance(),
-        user?.role !== 'LABOURER' ? getLabourers() : Promise.resolve({ data: { results: [], count: 0 } }),
-      ]);
-      setRecords(attRes.data.results || attRes.data);
-      setLabourers(labRes.data.results || labRes.data);
+      const attRes = await getAttendance();
+      setRecords(extractResults<Attendance>(attRes.data));
+
+      if (user?.role !== 'LABOURER') {
+        const labRes = await getLabourers();
+        setLabourers(extractResults<Labourer>(labRes.data));
+      }
+    } catch (err) {
+      console.error('Failed to fetch attendance data:', err);
     } finally {
       setLoading(false);
     }

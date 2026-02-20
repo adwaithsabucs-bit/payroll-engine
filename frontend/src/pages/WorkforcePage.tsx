@@ -3,7 +3,7 @@ import { getLabourers, getContractors } from '../api/workforce';
 import { Labourer, Contractor } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Users, Building } from 'lucide-react';
-
+import { extractResults } from '../utils/pagination';
 const WorkforcePage = () => {
   const { user } = useAuth();
   const [labourers, setLabourers] = useState<Labourer[]>([]);
@@ -15,18 +15,21 @@ const WorkforcePage = () => {
     const fetchAll = async () => {
       setLoading(true);
       try {
-        const [labRes, conRes] = await Promise.all([
-          getLabourers(),
-          user?.role !== 'CONTRACTOR' ? getContractors() : Promise.resolve({ data: [] }),
-        ]);
-        setLabourers(labRes.data.results || labRes.data);
-        setContractors(conRes.data.results || conRes.data);
+        const labRes = await getLabourers();
+        setLabourers(extractResults<Labourer>(labRes.data));
+
+        if (user?.role !== 'CONTRACTOR') {
+          const conRes = await getContractors();
+          setContractors(extractResults<Contractor>(conRes.data));
+        }
+      } catch (err) {
+        console.error('Failed to fetch workforce data:', err);
       } finally {
         setLoading(false);
       }
     };
     fetchAll();
-  }, []);
+  }, [user?.role]);
 
   if (loading) return <div style={{ padding: 40, color: '#64748b' }}>Loading workforce...</div>;
 

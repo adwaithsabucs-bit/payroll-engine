@@ -121,7 +121,15 @@ class Payroll(models.Model):
         self.total_salary = total_salary
 
     def save(self, *args, **kwargs):
-        # Auto-calculate on every save unless period is closed
-        if not self.period.is_closed:
-            self.calculate_payroll()
+        # Pop our custom flag — don't pass it to Django's save()
+        skip_recalculation = kwargs.pop('skip_recalculation', False)
+
+        # Only recalculate when:
+        #   1. The period is still open
+        #   2. No explicit skip flag was passed (approvals pass skip=True)
+        #   3. The record is still PENDING (already approved records are frozen)
+        if not skip_recalculation and not self.period.is_closed:
+            if self.payment_status == 'PENDING':
+                self.calculate_payroll()
+
         super().save(*args, **kwargs)

@@ -34,7 +34,7 @@ class GeneratePayrollView(APIView):
     """
     POST /api/payroll/periods/<id>/generate/
     HR triggers payroll generation for ALL labourers in a period.
-    Creates or recalculates Payroll records.
+    Creates or recalculates Payroll records safely.
     """
     permission_classes = [IsAuthenticated, IsHR]
 
@@ -45,24 +45,31 @@ class GeneratePayrollView(APIView):
             return Response({'error': 'Period not found.'}, status=404)
 
         if period.is_closed:
-            return Response({'error': 'Cannot regenerate payroll for a closed period.'}, status=400)
+            return Response(
+                {'error': 'Cannot regenerate payroll for a closed period.'},
+                status=400
+            )
 
         labourers = Labourer.objects.filter(is_active=True)
         created_count = 0
         updated_count = 0
 
         for labourer in labourers:
-            payroll, created = Payroll.objects.get_or_create(
-                period=period,
-                labourer=labourer,
-                defaults={'payment_status': 'PENDING'}
-            )
-            if not created:
-                # Recalculate
+            try:
+                # Record already exists — recalculate it
+                payroll = Payroll.objects.get(period=period, labourer=labourer)
                 payroll.calculate_payroll()
-                payroll.save()
+                payroll.save(skip_recalculation=True)
                 updated_count += 1
-            else:
+            except Payroll.DoesNotExist:
+                # New record — create, calculate, then save
+                payroll = Payroll(
+                    period=period,
+                    labourer=labourer,
+                    payment_status='PENDING'
+                )
+                payroll.calculate_payroll()
+                payroll.save(skip_recalculation=True)
                 created_count += 1
 
         return Response({
@@ -70,7 +77,6 @@ class GeneratePayrollView(APIView):
             'period': period.name,
             'total_labourers': labourers.count()
         })
-
 
 class PayrollListView(generics.ListAPIView):
     """GET /api/payroll/ — List payroll records (role-filtered)."""
@@ -146,9 +152,9 @@ class PayrollApproveView(APIView):
         elif new_status == 'PAID' and not payroll.paid_at:
             payroll.paid_at = timezone.now()
 
-        serializer.save()
+        # skip_recalculation=True prevents wages from being overwritten on approval
+        serializer.save(skip_recalculation=True)
         return Response(PayrollSerializer(payroll).data)
-
 
 class PayrollDashboardView(APIView):
     """GET /api/payroll/dashboard/ — HR summary stats."""

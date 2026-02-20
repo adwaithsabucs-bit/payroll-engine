@@ -21,7 +21,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (token) {
       authApi.getProfile()
         .then(res => setUser(res.data))
-        .catch(() => localStorage.clear())
+        .catch(() => {
+          // Token is invalid or expired — clear storage and redirect to login
+          localStorage.clear();
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
+        })
         .finally(() => setIsLoading(false));
     } else {
       setIsLoading(false);

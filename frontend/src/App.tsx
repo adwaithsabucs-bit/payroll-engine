@@ -7,7 +7,7 @@ import DashboardPage from './pages/DashboardPage';
 import WorkforcePage from './pages/WorkforcePage';
 import AttendancePage from './pages/AttendancePage';
 import PayrollPage from './pages/PayrollPage';
-
+import UsersPage from './pages/UsersPage';
 // Protected route wrapper
 const ProtectedRoute = ({ children, roles }: { children: React.ReactNode; roles?: string[] }) => {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -50,6 +50,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute roles={['HR']}>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute roles={['HR']}>
+            <UsersPage />
           </ProtectedRoute>
         }
       />
