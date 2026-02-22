@@ -1,3 +1,5 @@
+// frontend/src/pages/UsersPage.tsx — REPLACE ENTIRE FILE
+
 import React, { useEffect, useState } from 'react';
 import { getUsers, createUser } from '../api/auth';
 import { getContractors } from '../api/workforce';
@@ -6,50 +8,54 @@ import { extractResults } from '../utils/pagination';
 import { Plus, Pencil, X } from 'lucide-react';
 import apiClient from '../api/client';
 
-const ROLE_COLORS: Record<string, string> = {
-  HR: '#7c3aed',
-  SUPERVISOR: '#2563eb',
-  CONTRACTOR: '#d97706',
-  LABOURER: '#059669',
+const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
+  HR:         { bg: 'rgba(124,58,237,0.12)', color: '#a78bfa' },
+  SUPERVISOR: { bg: 'rgba(37,99,235,0.12)',  color: '#60a5fa' },
+  CONTRACTOR: { bg: 'rgba(202,138,4,0.12)',  color: '#facc15' },
+  LABOURER:   { bg: 'rgba(22,163,74,0.12)',  color: '#4ade80' },
 };
 
 const defaultForm = {
-  username: '',
-  email: '',
-  first_name: '',
-  last_name: '',
-  password: '',
-  password2: '',
-  role: 'LABOURER',
-  phone: '',
-  daily_wage: '0',
-  overtime_rate: '0',
-  skill: '',
-  contractor_id: '',
-  supervisor_id: '',
-  company_name: '',
+  username: '', email: '', first_name: '', last_name: '',
+  password: '', password2: '', role: 'LABOURER', phone: '',
+  daily_wage: '0', overtime_rate: '0', skill: '',
+  contractor_id: '', supervisor_id: '', company_name: '',
 };
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '9px 12px',
-  border: '1.5px solid #e5e7eb',
-  borderRadius: 8,
-  fontSize: 14,
-  boxSizing: 'border-box',
-  fontFamily: 'inherit',
-  outline: 'none',
+const S = {
+  page:  { animation: 'pageIn 0.4s cubic-bezier(0.16,1,0.3,1)' } as React.CSSProperties,
+  hdr:   { display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:32, paddingBottom:24, borderBottom:'1px solid #161616', position:'relative' } as React.CSSProperties,
+  hdrLine: { position:'absolute', bottom:-1, left:0, width:64, height:3, background:'#dc2626' } as React.CSSProperties,
+  title: { fontFamily:"'Barlow Condensed',sans-serif", fontSize:48, fontWeight:900, color:'white', textTransform:'uppercase', letterSpacing:-1, lineHeight:1 } as React.CSSProperties,
+  sub:   { fontSize:11, letterSpacing:4, textTransform:'uppercase', color:'#3f3f46', marginBottom:8, fontWeight:600 } as React.CSSProperties,
+  // stats
+  statsRow: { display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:2, marginBottom:24 } as React.CSSProperties,
+  statBox:  { background:'#0d0d0d', border:'1px solid #161616', padding:'20px 22px', position:'relative', overflow:'hidden', transition:'all 0.2s' } as React.CSSProperties,
+  statLabel:{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:9, fontWeight:700, letterSpacing:4, textTransform:'uppercase', color:'#3f3f46', marginBottom:8 } as React.CSSProperties,
+  statVal:  { fontFamily:"'Barlow Condensed',sans-serif", fontSize:40, fontWeight:900, lineHeight:1, letterSpacing:-2 } as React.CSSProperties,
+  statBar:  { position:'absolute', top:0, left:0, right:0, height:2 } as React.CSSProperties,
+  // table
+  tableWrap:{ background:'#0d0d0d', border:'1px solid #161616', overflow:'hidden' } as React.CSSProperties,
+  th: { padding:'12px 18px', textAlign:'left' as const, fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, color:'#3f3f46', textTransform:'uppercase' as const, letterSpacing:3 },
+  td: { padding:'13px 18px', fontSize:13, color:'#a1a1aa', borderBottom:'1px solid #111' },
+  // form panel
+  formPanel:{ background:'#0d0d0d', border:'1px solid #1e1e1e', borderTop:'3px solid #dc2626', padding:28, marginBottom:24 } as React.CSSProperties,
+  // modal overlay
+  overlay: { position:'fixed' as const, inset:0, background:'rgba(0,0,0,0.88)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:24 },
+  modal:   { background:'#0d0d0d', border:'1px solid #1e1e1e', borderTop:'3px solid #dc2626', width:'100%', maxWidth:600, maxHeight:'90vh', overflowY:'auto' as const, padding:32 },
+  // shared input/label
+  label: { display:'block', fontSize:9, letterSpacing:4, textTransform:'uppercase' as const, color:'#3f3f46', fontWeight:600, marginBottom:8 },
+  input: { width:'100%', background:'#141414', border:'1px solid #1e1e1e', borderBottom:'2px solid #222', color:'white', padding:'12px 14px', fontFamily:"'Barlow',sans-serif", fontSize:14, outline:'none', boxSizing:'border-box' as const, transition:'all 0.2s' },
+  // buttons
+  btn:     { display:'inline-flex', alignItems:'center', gap:8, background:'#dc2626', color:'white', border:'none', padding:'11px 22px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, fontWeight:700, letterSpacing:3, textTransform:'uppercase' as const, cursor:'pointer', clipPath:'polygon(0 0,92% 0,100% 25%,100% 100%,8% 100%,0 75%)' },
+  btnGhost:{ display:'inline-flex', alignItems:'center', gap:8, background:'transparent', color:'#52525b', border:'1px solid #1e1e1e', padding:'10px 20px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:12, fontWeight:700, letterSpacing:3, textTransform:'uppercase' as const, cursor:'pointer' },
+  btnEdit: { display:'inline-flex', alignItems:'center', gap:4, padding:'5px 12px', background:'#141414', color:'#71717a', border:'1px solid #1e1e1e', fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, letterSpacing:2, textTransform:'uppercase' as const, cursor:'pointer', transition:'all 0.15s' },
+  // profile section inside form
+  profileSection: { background:'#141414', border:'1px solid #1e1e1e', borderLeft:'2px solid #dc2626', padding:20, marginBottom:18 } as React.CSSProperties,
+  profileTitle:   { fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, letterSpacing:4, textTransform:'uppercase' as const, color:'#dc2626', marginBottom:16 },
 };
 
-const labelStyle: React.CSSProperties = {
-  fontSize: 12,
-  fontWeight: 600,
-  color: '#374151',
-  display: 'block',
-  marginBottom: 5,
-};
-
-const UsersPage = () => {
+export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [contractors, setContractors] = useState<any[]>([]);
   const [supervisors, setSupervisors] = useState<User[]>([]);
@@ -60,7 +66,6 @@ const UsersPage = () => {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
 
-  // Edit modal state
   const [editUser, setEditUser] = useState<any>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [editSubmitting, setEditSubmitting] = useState(false);
@@ -71,37 +76,27 @@ const UsersPage = () => {
     setLoading(true);
     try {
       const [uRes, supRes, conRes] = await Promise.all([
-        getUsers(),
-        getUsers('SUPERVISOR'),
-        getContractors(),
+        getUsers(), getUsers('SUPERVISOR'), getContractors(),
       ]);
       setUsers(extractResults<User>(uRes.data));
       setSupervisors(extractResults<User>(supRes.data));
       setContractors(extractResults<any>(conRes.data));
-    } catch (err) {
-      console.error('Failed to fetch user data:', err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { fetchData(); }, []);
 
-  // ── CREATE ──────────────────────────────────────────────
+  // ── CREATE ──────────────────────────────────────────────────
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
-    setMessage('');
+    setSubmitting(true); setMessage('');
     try {
       const payload: any = {
-        username: form.username,
-        email: form.email,
-        first_name: form.first_name,
-        last_name: form.last_name,
-        password: form.password,
-        password2: form.password2,
-        role: form.role,
-        phone: form.phone,
+        username: form.username, email: form.email,
+        first_name: form.first_name, last_name: form.last_name,
+        password: form.password, password2: form.password2,
+        role: form.role, phone: form.phone,
       };
       if (form.role === 'LABOURER') {
         payload.daily_wage = parseFloat(form.daily_wage) || 0;
@@ -114,88 +109,56 @@ const UsersPage = () => {
         if (form.supervisor_id) payload.supervisor_id = parseInt(form.supervisor_id);
       }
       await createUser(payload);
-      setMessage('User created successfully!');
-      setIsError(false);
-      setShowForm(false);
-      setForm(defaultForm);
-      fetchData();
+      setMessage('User created successfully.'); setIsError(false);
+      setShowForm(false); setForm(defaultForm); fetchData();
     } catch (err: any) {
       const d = err.response?.data;
-      const msg = d
-        ? Object.entries(d).map(([k, v]) => `${k}: ${Array.isArray(v) ? v[0] : v}`).join(' | ')
-        : 'Failed to create user.';
-      setMessage(msg);
+      setMessage(d ? Object.entries(d).map(([k,v])=>`${k}: ${Array.isArray(v)?v[0]:v}`).join(' | ') : 'Failed to create user.');
       setIsError(true);
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
-  // ── OPEN EDIT MODAL ──────────────────────────────────────
+  // ── OPEN EDIT ────────────────────────────────────────────────
   const openEdit = async (user: User) => {
-    setEditMessage('');
-    setEditIsError(false);
-
-    // Base fields
+    setEditMessage(''); setEditIsError(false);
     const base: any = {
-      first_name: user.first_name || '',
-      last_name: user.last_name || '',
-      email: user.email,
-      phone: user.phone || '',
-      role: user.role,
-      // profile fields with defaults
-      daily_wage: '0',
-      overtime_rate: '0',
-      skill: '',
-      contractor_id: '',
-      supervisor_id: '',
-      company_name: '',
+      first_name: user.first_name||'', last_name: user.last_name||'',
+      email: user.email, phone: user.phone||'', role: user.role,
+      daily_wage:'0', overtime_rate:'0', skill:'', contractor_id:'', supervisor_id:'', company_name:'',
     };
-
-    // Fetch current profile data
     try {
       if (user.role === 'LABOURER') {
         const res = await apiClient.get(`/workforce/labourers/?user=${user.id}`);
         const results = extractResults<any>(res.data);
         if (results.length > 0) {
           const p = results[0];
-          base.daily_wage = p.daily_wage || '0';
-          base.overtime_rate = p.overtime_rate || '0';
-          base.skill = p.skill || '';
-          base.contractor_id = p.contractor ? String(p.contractor) : '';
+          base.daily_wage = p.daily_wage||'0'; base.overtime_rate = p.overtime_rate||'0';
+          base.skill = p.skill||''; base.contractor_id = p.contractor ? String(p.contractor) : '';
         }
       } else if (user.role === 'CONTRACTOR') {
         const res = await apiClient.get(`/workforce/contractors/?user=${user.id}`);
         const results = extractResults<any>(res.data);
         if (results.length > 0) {
           const p = results[0];
-          base.company_name = p.company_name || '';
-          base.supervisor_id = p.supervisor ? String(p.supervisor) : '';
+          base.company_name = p.company_name||''; base.supervisor_id = p.supervisor ? String(p.supervisor) : '';
         }
       }
     } catch {}
-
-    setEditUser(user);
-    setEditForm(base);
+    setEditUser(user); setEditForm(base);
   };
 
-  // ── SAVE EDIT ────────────────────────────────────────────
+  // ── SAVE EDIT ────────────────────────────────────────────────
   const handleEditSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEditSubmitting(true);
-    setEditMessage('');
+    setEditSubmitting(true); setEditMessage('');
     try {
       const payload: any = {
-        first_name: editForm.first_name,
-        last_name: editForm.last_name,
-        email: editForm.email,
-        phone: editForm.phone,
-        role: editForm.role,
+        first_name: editForm.first_name, last_name: editForm.last_name,
+        email: editForm.email, phone: editForm.phone, role: editForm.role,
       };
-
       if (editForm.role === 'LABOURER') {
-        payload.daily_wage = parseFloat(editForm.daily_wage) || 0;
-        payload.overtime_rate = parseFloat(editForm.overtime_rate) || 0;
+        payload.daily_wage = parseFloat(editForm.daily_wage)||0;
+        payload.overtime_rate = parseFloat(editForm.overtime_rate)||0;
         payload.skill = editForm.skill;
         if (editForm.contractor_id) payload.contractor_id = parseInt(editForm.contractor_id);
       }
@@ -203,382 +166,304 @@ const UsersPage = () => {
         payload.company_name = editForm.company_name;
         if (editForm.supervisor_id) payload.supervisor_id = parseInt(editForm.supervisor_id);
       }
-
       await apiClient.patch(`/auth/users/${editUser.id}/`, payload);
-      setEditMessage('User updated successfully!');
-      setEditIsError(false);
-      fetchData();
-      setTimeout(() => setEditUser(null), 1000);
+      setEditMessage('User updated successfully.'); setEditIsError(false);
+      fetchData(); setTimeout(() => setEditUser(null), 900);
     } catch (err: any) {
       const d = err.response?.data;
-      const msg = d
-        ? Object.entries(d).map(([k, v]) => `${k}: ${Array.isArray(v) ? v[0] : v}`).join(' | ')
-        : 'Failed to update user.';
-      setEditMessage(msg);
+      setEditMessage(d ? Object.entries(d).map(([k,v])=>`${k}: ${Array.isArray(v)?v[0]:v}`).join(' | ') : 'Failed to update user.');
       setEditIsError(true);
-    } finally {
-      setEditSubmitting(false);
-    }
+    } finally { setEditSubmitting(false); }
   };
 
-  if (loading) return <div style={{ padding: 40, color: '#64748b' }}>Loading users...</div>;
+  // Role counts for stat cards
+  const countRole = (r: string) => users.filter(u => u.role === r).length;
 
-  return (
-    <div>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+  const FormFields = ({ f, setF, isEdit = false }: { f: any; setF: any; isEdit?: boolean }) => (
+    <>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
+        {!isEdit && (
+          <div>
+            <label style={S.label}>Username *</label>
+            <input className="usr-input" style={S.input} type="text" required value={f.username} onChange={e=>setF({...f,username:e.target.value})}/>
+          </div>
+        )}
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#1e293b', margin: 0 }}>User Management</h1>
-          <p style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>{users.length} users — HR only</p>
+          <label style={S.label}>Email *</label>
+          <input className="usr-input" style={S.input} type="email" required={!isEdit} value={f.email} onChange={e=>setF({...f,email:e.target.value})}/>
         </div>
-        <button onClick={() => setShowForm(!showForm)} style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          background: '#f59e0b', color: 'white', border: 'none',
-          borderRadius: 8, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-        }}>
-          <Plus size={16} /> New User
-        </button>
+        <div>
+          <label style={S.label}>First Name</label>
+          <input className="usr-input" style={S.input} type="text" value={f.first_name} onChange={e=>setF({...f,first_name:e.target.value})}/>
+        </div>
+        <div>
+          <label style={S.label}>Last Name</label>
+          <input className="usr-input" style={S.input} type="text" value={f.last_name} onChange={e=>setF({...f,last_name:e.target.value})}/>
+        </div>
+        {!isEdit && (
+          <>
+            <div>
+              <label style={S.label}>Password *</label>
+              <input className="usr-input" style={S.input} type="password" required value={f.password} onChange={e=>setF({...f,password:e.target.value})}/>
+            </div>
+            <div>
+              <label style={S.label}>Confirm Password *</label>
+              <input className="usr-input" style={S.input} type="password" required value={f.password2} onChange={e=>setF({...f,password2:e.target.value})}/>
+            </div>
+          </>
+        )}
+        <div>
+          <label style={S.label}>Phone</label>
+          <input className="usr-input" style={S.input} type="text" value={f.phone} onChange={e=>setF({...f,phone:e.target.value})}/>
+        </div>
+        <div>
+          <label style={S.label}>Role *</label>
+          <select className="usr-input" style={S.input} value={f.role} onChange={e=>setF({...f,role:e.target.value})}>
+            <option value="HR">HR Manager</option>
+            <option value="SUPERVISOR">Supervisor</option>
+            <option value="CONTRACTOR">Contractor</option>
+            <option value="LABOURER">Labourer</option>
+          </select>
+        </div>
       </div>
 
-      {/* Create message */}
-      {message && (
-        <div style={{
-          background: isError ? '#fef2f2' : '#f0fdf4',
-          border: `1px solid ${isError ? '#fecaca' : '#bbf7d0'}`,
-          color: isError ? '#dc2626' : '#166534',
-          padding: '12px 16px', borderRadius: 8, marginBottom: 20, fontSize: 13,
-        }}>
-          {message}
-        </div>
-      )}
-
-      {/* Create form */}
-      {showForm && (
-        <div style={{
-          background: 'white', borderRadius: 12, padding: 24,
-          border: '1px solid #e2e8f0', marginBottom: 24,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-        }}>
-          <h2 style={{ fontWeight: 700, color: '#1e293b', marginBottom: 20, fontSize: 18 }}>Create New User</h2>
-          <form onSubmit={handleCreate}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-              {[
-                ['Username *', 'username', 'text'],
-                ['Email *', 'email', 'email'],
-                ['First Name', 'first_name', 'text'],
-                ['Last Name', 'last_name', 'text'],
-                ['Password *', 'password', 'password'],
-                ['Confirm Password *', 'password2', 'password'],
-                ['Phone', 'phone', 'text'],
-              ].map(([label, field, type]) => (
-                <div key={field}>
-                  <label style={labelStyle}>{label}</label>
-                  <input type={type} required={label.includes('*')}
-                    value={(form as any)[field]}
-                    onChange={e => setForm({ ...form, [field]: e.target.value })}
-                    style={inputStyle} />
-                </div>
+      {f.role === 'LABOURER' && (
+        <div style={S.profileSection}>
+          <div style={S.profileTitle}>⬡ Labourer Profile</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:12 }}>
+            <div>
+              <label style={S.label}>Daily Wage (₹)</label>
+              <input className="usr-input" style={S.input} type="number" min="0" step="0.01" value={f.daily_wage} onChange={e=>setF({...f,daily_wage:e.target.value})}/>
+            </div>
+            <div>
+              <label style={S.label}>Overtime Rate (₹/hr)</label>
+              <input className="usr-input" style={S.input} type="number" min="0" step="0.01" value={f.overtime_rate} onChange={e=>setF({...f,overtime_rate:e.target.value})}/>
+            </div>
+            <div>
+              <label style={S.label}>Skill</label>
+              <input className="usr-input" style={S.input} type="text" placeholder="e.g. Mason" value={f.skill} onChange={e=>setF({...f,skill:e.target.value})}/>
+            </div>
+          </div>
+          <div>
+            <label style={S.label}>Assign to Contractor</label>
+            <select className="usr-input" style={S.input} value={f.contractor_id} onChange={e=>setF({...f,contractor_id:e.target.value})}>
+              <option value="">-- No contractor yet --</option>
+              {contractors.map((c:any) => (
+                <option key={c.id} value={c.id}>
+                  {c.user_detail?.first_name} {c.user_detail?.last_name||c.user_detail?.username}
+                  {c.company_name ? ` — ${c.company_name}` : ''}
+                </option>
               ))}
-              <div>
-                <label style={labelStyle}>Role *</label>
-                <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} style={inputStyle}>
-                  <option value="HR">HR Manager</option>
-                  <option value="SUPERVISOR">Supervisor</option>
-                  <option value="CONTRACTOR">Contractor</option>
-                  <option value="LABOURER">Labourer</option>
-                </select>
-              </div>
-            </div>
-
-            {form.role === 'LABOURER' && (
-              <div style={{ background: '#f8fafc', borderRadius: 8, padding: 16, marginBottom: 14, border: '1px solid #e2e8f0' }}>
-                <p style={{ fontWeight: 700, color: '#1e293b', fontSize: 13, marginTop: 0, marginBottom: 12 }}>Labourer Profile</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label style={labelStyle}>Daily Wage (₹)</label>
-                    <input type="number" min="0" step="0.01" value={form.daily_wage}
-                      onChange={e => setForm({ ...form, daily_wage: e.target.value })} style={inputStyle} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Overtime Rate (₹/hr)</label>
-                    <input type="number" min="0" step="0.01" value={form.overtime_rate}
-                      onChange={e => setForm({ ...form, overtime_rate: e.target.value })} style={inputStyle} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Skill</label>
-                    <input type="text" placeholder="e.g. Mason" value={form.skill}
-                      onChange={e => setForm({ ...form, skill: e.target.value })} style={inputStyle} />
-                  </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={labelStyle}>Assign to Contractor</label>
-                    <select value={form.contractor_id} onChange={e => setForm({ ...form, contractor_id: e.target.value })} style={inputStyle}>
-                      <option value="">-- No contractor yet --</option>
-                      {contractors.map((c: any) => (
-                        <option key={c.id} value={c.id}>
-                          {c.user_detail?.first_name} {c.user_detail?.last_name || c.user_detail?.username}
-                          {c.company_name ? ` — ${c.company_name}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {form.role === 'CONTRACTOR' && (
-              <div style={{ background: '#f8fafc', borderRadius: 8, padding: 16, marginBottom: 14, border: '1px solid #e2e8f0' }}>
-                <p style={{ fontWeight: 700, color: '#1e293b', fontSize: 13, marginTop: 0, marginBottom: 12 }}>Contractor Profile</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label style={labelStyle}>Company Name</label>
-                    <input type="text" value={form.company_name}
-                      onChange={e => setForm({ ...form, company_name: e.target.value })} style={inputStyle} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Assign Supervisor</label>
-                    <select value={form.supervisor_id} onChange={e => setForm({ ...form, supervisor_id: e.target.value })} style={inputStyle}>
-                      <option value="">-- No supervisor yet --</option>
-                      {supervisors.map(s => (
-                        <option key={s.id} value={s.id}>{s.first_name} {s.last_name || s.username}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button type="submit" disabled={submitting} style={{
-                padding: '10px 24px', background: submitting ? '#9ca3af' : '#f59e0b',
-                color: 'white', border: 'none', borderRadius: 8,
-                fontSize: 14, fontWeight: 600, cursor: submitting ? 'not-allowed' : 'pointer',
-              }}>
-                {submitting ? 'Creating...' : 'Create User'}
-              </button>
-              <button type="button" onClick={() => { setShowForm(false); setForm(defaultForm); }} style={{
-                padding: '10px 24px', background: 'white', color: '#64748b',
-                border: '1.5px solid #e5e7eb', borderRadius: 8, fontSize: 14, cursor: 'pointer',
-              }}>
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Users Table */}
-      <div style={{
-        background: 'white', borderRadius: 12, overflow: 'hidden',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #f1f5f9',
-      }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-              {['Username', 'Full Name', 'Email', 'Role', 'Phone', 'Edit'].map(h => (
-                <th key={h} style={{
-                  padding: '12px 16px', textAlign: 'left', fontSize: 12,
-                  fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em',
-                }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {users.length === 0 ? (
-              <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>No users found</td></tr>
-            ) : users.map((u, i) => (
-              <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? 'white' : '#fafafa' }}>
-                <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 500, color: '#1e293b' }}>{u.username}</td>
-                <td style={{ padding: '12px 16px', fontSize: 14, color: '#374151' }}>{u.first_name} {u.last_name}</td>
-                <td style={{ padding: '12px 16px', fontSize: 13, color: '#64748b' }}>{u.email}</td>
-                <td style={{ padding: '12px 16px' }}>
-                  <span style={{
-                    background: ROLE_COLORS[u.role] + '20', color: ROLE_COLORS[u.role],
-                    padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                  }}>{u.role}</span>
-                </td>
-                <td style={{ padding: '12px 16px', fontSize: 13, color: '#64748b' }}>{u.phone || '—'}</td>
-                <td style={{ padding: '12px 16px' }}>
-                  <button onClick={() => openEdit(u)} style={{
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '5px 12px', background: '#f1f5f9', color: '#374151',
-                    border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12,
-                    cursor: 'pointer', fontWeight: 600,
-                  }}>
-                    <Pencil size={12} /> Edit
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* ── EDIT MODAL ── */}
-      {editUser && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000, padding: 24,
-        }}>
-          <div style={{
-            background: 'white', borderRadius: 16, padding: 32,
-            width: '100%', maxWidth: 600, maxHeight: '90vh',
-            overflowY: 'auto', boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
-          }}>
-            {/* Modal header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div>
-                <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', margin: 0 }}>
-                  Edit User
-                </h2>
-                <p style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>@{editUser.username}</p>
-              </div>
-              <button onClick={() => setEditUser(null)} style={{
-                background: '#f1f5f9', border: 'none', borderRadius: 8,
-                padding: 8, cursor: 'pointer', display: 'flex',
-              }}>
-                <X size={18} color="#64748b" />
-              </button>
-            </div>
-
-            {editMessage && (
-              <div style={{
-                background: editIsError ? '#fef2f2' : '#f0fdf4',
-                border: `1px solid ${editIsError ? '#fecaca' : '#bbf7d0'}`,
-                color: editIsError ? '#dc2626' : '#166534',
-                padding: '10px 14px', borderRadius: 8, marginBottom: 20, fontSize: 13,
-              }}>
-                {editMessage}
-              </div>
-            )}
-
-            <form onSubmit={handleEditSave}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-                <div>
-                  <label style={labelStyle}>First Name</label>
-                  <input type="text" value={editForm.first_name}
-                    onChange={e => setEditForm({ ...editForm, first_name: e.target.value })}
-                    style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Last Name</label>
-                  <input type="text" value={editForm.last_name}
-                    onChange={e => setEditForm({ ...editForm, last_name: e.target.value })}
-                    style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Email</label>
-                  <input type="email" value={editForm.email}
-                    onChange={e => setEditForm({ ...editForm, email: e.target.value })}
-                    style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Phone</label>
-                  <input type="text" value={editForm.phone}
-                    onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                    style={inputStyle} />
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Role</label>
-                  <select value={editForm.role}
-                    onChange={e => setEditForm({ ...editForm, role: e.target.value })}
-                    style={inputStyle}>
-                    <option value="HR">HR Manager</option>
-                    <option value="SUPERVISOR">Supervisor</option>
-                    <option value="CONTRACTOR">Contractor</option>
-                    <option value="LABOURER">Labourer</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Labourer profile edit fields */}
-              {editForm.role === 'LABOURER' && (
-                <div style={{ background: '#f8fafc', borderRadius: 8, padding: 16, marginBottom: 14, border: '1px solid #e2e8f0' }}>
-                  <p style={{ fontWeight: 700, color: '#1e293b', fontSize: 13, marginTop: 0, marginBottom: 12 }}>Labourer Profile</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                    <div>
-                      <label style={labelStyle}>Daily Wage (₹)</label>
-                      <input type="number" min="0" step="0.01" value={editForm.daily_wage}
-                        onChange={e => setEditForm({ ...editForm, daily_wage: e.target.value })}
-                        style={inputStyle} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Overtime Rate (₹/hr)</label>
-                      <input type="number" min="0" step="0.01" value={editForm.overtime_rate}
-                        onChange={e => setEditForm({ ...editForm, overtime_rate: e.target.value })}
-                        style={inputStyle} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Skill</label>
-                      <input type="text" value={editForm.skill}
-                        onChange={e => setEditForm({ ...editForm, skill: e.target.value })}
-                        style={inputStyle} />
-                    </div>
-                    <div style={{ gridColumn: '1 / -1' }}>
-                      <label style={labelStyle}>Contractor</label>
-                      <select value={editForm.contractor_id}
-                        onChange={e => setEditForm({ ...editForm, contractor_id: e.target.value })}
-                        style={inputStyle}>
-                        <option value="">-- No contractor --</option>
-                        {contractors.map((c: any) => (
-                          <option key={c.id} value={c.id}>
-                            {c.user_detail?.first_name} {c.user_detail?.last_name || c.user_detail?.username}
-                            {c.company_name ? ` — ${c.company_name}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Contractor profile edit fields */}
-              {editForm.role === 'CONTRACTOR' && (
-                <div style={{ background: '#f8fafc', borderRadius: 8, padding: 16, marginBottom: 14, border: '1px solid #e2e8f0' }}>
-                  <p style={{ fontWeight: 700, color: '#1e293b', fontSize: 13, marginTop: 0, marginBottom: 12 }}>Contractor Profile</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div>
-                      <label style={labelStyle}>Company Name</label>
-                      <input type="text" value={editForm.company_name}
-                        onChange={e => setEditForm({ ...editForm, company_name: e.target.value })}
-                        style={inputStyle} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Supervisor</label>
-                      <select value={editForm.supervisor_id}
-                        onChange={e => setEditForm({ ...editForm, supervisor_id: e.target.value })}
-                        style={inputStyle}>
-                        <option value="">-- No supervisor --</option>
-                        {supervisors.map(s => (
-                          <option key={s.id} value={s.id}>{s.first_name} {s.last_name || s.username}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-                <button type="submit" disabled={editSubmitting} style={{
-                  padding: '10px 24px', background: editSubmitting ? '#9ca3af' : '#f59e0b',
-                  color: 'white', border: 'none', borderRadius: 8,
-                  fontSize: 14, fontWeight: 600, cursor: editSubmitting ? 'not-allowed' : 'pointer',
-                }}>
-                  {editSubmitting ? 'Saving...' : 'Save Changes'}
-                </button>
-                <button type="button" onClick={() => setEditUser(null)} style={{
-                  padding: '10px 24px', background: 'white', color: '#64748b',
-                  border: '1.5px solid #e5e7eb', borderRadius: 8, fontSize: 14, cursor: 'pointer',
-                }}>
-                  Cancel
-                </button>
-              </div>
-            </form>
+            </select>
           </div>
         </div>
       )}
+
+      {f.role === 'CONTRACTOR' && (
+        <div style={S.profileSection}>
+          <div style={S.profileTitle}>⬡ Contractor Profile</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <div>
+              <label style={S.label}>Company Name</label>
+              <input className="usr-input" style={S.input} type="text" value={f.company_name} onChange={e=>setF({...f,company_name:e.target.value})}/>
+            </div>
+            <div>
+              <label style={S.label}>Assign Supervisor</label>
+              <select className="usr-input" style={S.input} value={f.supervisor_id} onChange={e=>setF({...f,supervisor_id:e.target.value})}>
+                <option value="">-- No supervisor yet --</option>
+                {supervisors.map(sv => (
+                  <option key={sv.id} value={sv.id}>{sv.first_name} {sv.last_name||sv.username}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  if (loading) return (
+    <div style={{ display:'flex', alignItems:'center', gap:14, padding:'60px 0', color:'#3f3f46', fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, letterSpacing:4, textTransform:'uppercase' }}>
+      <div style={{ width:40, height:2, background:'#161616', position:'relative', overflow:'hidden' }}>
+        <div style={{ position:'absolute', inset:0, background:'#dc2626', animation:'loadBar 1s ease infinite' }}/>
+      </div>
+      Loading users...
+      <style>{`@keyframes loadBar{from{transform:translateX(-100%)}to{transform:translateX(100%)}}`}</style>
     </div>
   );
-};
 
-export default UsersPage;
+  return (
+    <>
+      <style>{`
+        @keyframes pageIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+        .usr-input:focus { border-bottom-color:#dc2626!important; background:#181818!important; }
+        select.usr-input option { background:#141414; color:white; }
+        .usr-stat:hover { background:#111!important; transform:translateY(-2px); }
+        .usr-row:hover td { background:#111; }
+        .usr-edit-btn:hover { background:#1e1e1e!important; color:white!important; border-color:#dc2626!important; }
+      `}</style>
+
+      <div style={S.page}>
+        {/* ── Header ── */}
+        <div style={S.hdr}>
+          <div style={S.hdrLine}/>
+          <div>
+            <div style={S.sub}>Administration</div>
+            <div style={S.title}>User Management</div>
+          </div>
+          <button style={S.btn} onClick={() => setShowForm(!showForm)}>
+            <Plus size={14}/> New User
+          </button>
+        </div>
+
+        {/* ── Message ── */}
+        {message && (
+          <div style={{ background: isError?'rgba(220,38,38,0.07)':'rgba(22,163,74,0.07)', borderLeft:`3px solid ${isError?'#dc2626':'#16a34a'}`, padding:'12px 16px', marginBottom:20, fontSize:13, color: isError?'#fca5a5':'#4ade80' }}>
+            {message}
+          </div>
+        )}
+
+        {/* ── Stats ── */}
+        <div style={S.statsRow}>
+          {[
+            { label:'Total Users',   val: users.length,         color:'#dc2626' },
+            { label:'HR & Supervisors', val: countRole('HR')+countRole('SUPERVISOR'), color:'#a78bfa' },
+            { label:'Contractors',   val: countRole('CONTRACTOR'), color:'#facc15' },
+            { label:'Labourers',     val: countRole('LABOURER'),   color:'#4ade80' },
+          ].map(s => (
+            <div key={s.label} className="usr-stat" style={S.statBox}>
+              <div style={{...S.statBar, background:s.color}}/>
+              <div style={S.statLabel}>{s.label}</div>
+              <div style={{...S.statVal, color:s.color}}>{s.val}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Create Form ── */}
+        {showForm && (
+          <div style={S.formPanel}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24, paddingBottom:20, borderBottom:'1px solid #1a1a1a' }}>
+              <div>
+                <div style={{ fontSize:9, letterSpacing:5, textTransform:'uppercase', color:'#dc2626', fontWeight:600, marginBottom:4 }}>HR Administration</div>
+                <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:26, fontWeight:900, color:'white', textTransform:'uppercase', letterSpacing:-0.5 }}>Create New User</div>
+              </div>
+              <button onClick={()=>{setShowForm(false);setForm(defaultForm);}} style={{ background:'#1a1a1a', border:'1px solid #222', color:'#52525b', width:32, height:32, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                <X size={16}/>
+              </button>
+            </div>
+            <form onSubmit={handleCreate}>
+              <FormFields f={form} setF={setForm}/>
+              <div style={{ display:'flex', gap:12, marginTop:8 }}>
+                <button type="submit" disabled={submitting} style={{...S.btn, background: submitting?'#27272a':'#dc2626', clipPath: submitting?'none':undefined}}>
+                  {submitting ? 'Creating...' : 'Create User →'}
+                </button>
+                <button type="button" style={S.btnGhost} onClick={()=>{setShowForm(false);setForm(defaultForm);}}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ── Users Table ── */}
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
+          <div style={{ width:28, height:2, background:'#dc2626' }}/>
+          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:11, fontWeight:700, letterSpacing:4, textTransform:'uppercase', color:'#52525b' }}>
+            All Users — {users.length} total
+          </div>
+        </div>
+
+        <div style={S.tableWrap}>
+          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <thead>
+              <tr style={{ background:'#0a0a0a', borderBottom:'1px solid #1a1a1a' }}>
+                {['#','Username','Full Name','Email','Role','Phone','Edit'].map(h => (
+                  <th key={h} style={S.th}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {users.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ padding:60, textAlign:'center', color:'#27272a', fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:4, textTransform:'uppercase', fontSize:14 }}>
+                    No Users Found
+                  </td>
+                </tr>
+              ) : users.map((u, i) => {
+                const rc = ROLE_COLORS[u.role] || { bg:'rgba(82,82,91,0.2)', color:'#a1a1aa' };
+                return (
+                  <tr key={u.id} className="usr-row">
+                    <td style={{...S.td, color:'#27272a', fontFamily:"'Barlow Condensed',sans-serif", fontSize:12, fontWeight:700 }}>
+                      {String(i+1).padStart(2,'0')}
+                    </td>
+                    <td style={{...S.td, color:'white', fontWeight:600, fontFamily:"'Barlow Condensed',sans-serif", fontSize:14, letterSpacing:1 }}>
+                      {u.username}
+                    </td>
+                    <td style={{...S.td, color:'#a1a1aa'}}>
+                      {u.first_name} {u.last_name}
+                    </td>
+                    <td style={{...S.td, color:'#52525b', fontSize:12}}>
+                      {u.email}
+                    </td>
+                    <td style={S.td}>
+                      <span style={{ background:rc.bg, color:rc.color, padding:'3px 10px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, letterSpacing:2, textTransform:'uppercase' }}>
+                        {u.role}
+                      </span>
+                    </td>
+                    <td style={{...S.td, color:'#52525b', fontSize:12}}>
+                      {u.phone || '—'}
+                    </td>
+                    <td style={S.td}>
+                      <button
+                        className="usr-edit-btn"
+                        onClick={() => openEdit(u)}
+                        style={S.btnEdit}
+                      >
+                        <Pencil size={11}/> Edit
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ── Edit Modal ── */}
+        {editUser && (
+          <div style={S.overlay}>
+            <div style={S.modal}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24, paddingBottom:20, borderBottom:'1px solid #1a1a1a' }}>
+                <div>
+                  <div style={{ fontSize:9, letterSpacing:5, textTransform:'uppercase', color:'#dc2626', fontWeight:600, marginBottom:4 }}>Editing</div>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:28, fontWeight:900, color:'white', textTransform:'uppercase', letterSpacing:-1, lineHeight:1 }}>
+                    {editUser.username}
+                  </div>
+                  <div style={{ fontSize:11, color:'#3f3f46', marginTop:4, letterSpacing:1 }}>{editUser.email}</div>
+                </div>
+                <button onClick={() => setEditUser(null)} style={{ background:'#1a1a1a', border:'1px solid #222', color:'#52525b', width:32, height:32, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
+                  <X size={16}/>
+                </button>
+              </div>
+
+              {editMessage && (
+                <div style={{ background: editIsError?'rgba(220,38,38,0.07)':'rgba(22,163,74,0.07)', borderLeft:`3px solid ${editIsError?'#dc2626':'#16a34a'}`, padding:'10px 16px', marginBottom:20, fontSize:13, color: editIsError?'#fca5a5':'#4ade80' }}>
+                  {editMessage}
+                </div>
+              )}
+
+              <form onSubmit={handleEditSave}>
+                <FormFields f={editForm} setF={setEditForm} isEdit/>
+                <div style={{ display:'flex', gap:12, marginTop:8, paddingTop:20, borderTop:'1px solid #1a1a1a' }}>
+                  <button type="submit" disabled={editSubmitting}
+                    style={{...S.btn, background: editSubmitting?'#27272a':'#dc2626', clipPath: editSubmitting?'none':undefined}}>
+                    {editSubmitting ? 'Saving...' : 'Save Changes →'}
+                  </button>
+                  <button type="button" style={S.btnGhost} onClick={() => setEditUser(null)}>Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
