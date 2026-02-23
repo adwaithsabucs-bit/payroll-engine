@@ -1,0 +1,45 @@
+/* frontend/src/global.css — ADD THIS FILE and import in src/index.tsx */
+/* Fixes all grey text to white across the entire application */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #09090b;
+  color: white;
+}
+
+/* Force all paragraph, span, div text to be readable */
+p, span, div, li, td, th, label {
+  color: inherit;
+}
+
+/* Tables */
+table { border-collapse: collapse; width: 100%; }
+td, th { color: white; }
+
+/* Inputs */
+input, select, textarea, button {
+  font-family: inherit;
+}
+
+input::placeholder {
+  color: #52525b;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #0d0d0d; }
+::-webkit-scrollbar-thumb { background: #1e1e1e; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #dc2626; }
+
+/* Links */
+a { text-decoration: none; color: inherit; }
+
+/* Remove default blue focus outline, use red */
+*:focus-visible {
+  outline: 1px solid #dc2626;
+  outline-offset: 2px;
+}
