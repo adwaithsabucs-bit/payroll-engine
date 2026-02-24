@@ -1,57 +1,56 @@
+# payroll/serializers.py — REPLACE ENTIRE FILE
+
 from rest_framework import serializers
-from .models import PayrollPeriod, Payroll
-from workforce.serializers import LabourerListSerializer
+from .models import SupervisorPayroll, ContractorPayroll, LabourerPayroll
 
 
-class PayrollPeriodSerializer(serializers.ModelSerializer):
-    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
-    payroll_count = serializers.SerializerMethodField()
-
-    class Meta:
-        model = PayrollPeriod
-        fields = ['id', 'name', 'start_date', 'end_date', 'is_closed',
-                  'created_by', 'created_by_username', 'payroll_count', 'created_at']
-        read_only_fields = ['id', 'created_by', 'created_at']
-
-    def get_payroll_count(self, obj):
-        return obj.payrolls.count()
-
-    def validate(self, data):
-        if data.get('start_date') and data.get('end_date'):
-            if data['start_date'] > data['end_date']:
-                raise serializers.ValidationError("Start date must be before end date.")
-        return data
-
-
-class PayrollSerializer(serializers.ModelSerializer):
-    labourer_detail = LabourerListSerializer(source='labourer', read_only=True)
-    period_detail = PayrollPeriodSerializer(source='period', read_only=True)
-    approved_by_username = serializers.CharField(source='approved_by.username', read_only=True)
+class SupervisorPayrollSerializer(serializers.ModelSerializer):
+    supervisor_name = serializers.SerializerMethodField()
+    project_name    = serializers.CharField(source='project.name', read_only=True)
 
     class Meta:
-        model = Payroll
-        fields = [
-            'id', 'period', 'period_detail', 'labourer', 'labourer_detail',
-            'present_days', 'total_overtime_hours',
-            'daily_wage_snapshot', 'overtime_rate_snapshot',
-            'basic_salary', 'overtime_pay', 'total_salary',
-            'payment_status', 'approved_by', 'approved_by_username',
-            'approved_at', 'paid_at', 'notes', 'created_at', 'updated_at'
-        ]
-        read_only_fields = [
-            'id', 'present_days', 'total_overtime_hours',
-            'daily_wage_snapshot', 'overtime_rate_snapshot',
-            'basic_salary', 'overtime_pay', 'total_salary',
-            'approved_by', 'approved_at', 'paid_at', 'created_at', 'updated_at'
-        ]
+        model = SupervisorPayroll
+        fields = '__all__'
+        read_only_fields = ['total_amount', 'created_by', 'created_at', 'updated_at']
+
+    def get_supervisor_name(self, obj):
+        u = obj.supervisor
+        return f"{u.first_name} {u.last_name or u.username}".strip()
 
 
-class PayrollApproveSerializer(serializers.ModelSerializer):
+class ContractorPayrollSerializer(serializers.ModelSerializer):
+    contractor_name = serializers.SerializerMethodField()
+    project_name    = serializers.CharField(source='project.name', read_only=True)
+    period_name     = serializers.CharField(source='period.name', read_only=True)
+
     class Meta:
-        model = Payroll
-        fields = ['payment_status', 'notes']
+        model = ContractorPayroll
+        fields = '__all__'
+        read_only_fields = ['total_amount', 'created_by', 'created_at', 'updated_at']
 
-    def validate_payment_status(self, value):
-        if value not in ['APPROVED', 'PAID', 'DISPUTED']:
-            raise serializers.ValidationError("Invalid payment status.")
-        return value
+    def get_contractor_name(self, obj):
+        u = obj.contractor.user
+        return f"{u.first_name} {u.last_name or u.username}".strip()
+
+
+class LabourerPayrollSerializer(serializers.ModelSerializer):
+    labourer_name = serializers.SerializerMethodField()
+    is_temp       = serializers.SerializerMethodField()
+    project_name  = serializers.CharField(source='project.name', read_only=True)
+    period_name   = serializers.CharField(source='period.name', read_only=True)
+
+    class Meta:
+        model = LabourerPayroll
+        fields = '__all__'
+        read_only_fields = ['total_amount', 'created_by', 'created_at', 'updated_at']
+
+    def get_labourer_name(self, obj):
+        if obj.labourer:
+            u = obj.labourer.user
+            return f"{u.first_name} {u.last_name or u.username}".strip()
+        if obj.temp_labourer:
+            return f"{obj.temp_labourer.name} (Temp)"
+        return "Unknown"
+
+    def get_is_temp(self, obj):
+        return obj.temp_labourer_id is not None

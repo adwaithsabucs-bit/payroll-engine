@@ -1,12 +1,22 @@
+# payroll/urls.py — REPLACE ENTIRE FILE
+
 from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('', views.PayrollListView.as_view(), name='payroll-list'),
+    # Dashboard
     path('dashboard/', views.PayrollDashboardView.as_view(), name='payroll-dashboard'),
-    path('periods/', views.PayrollPeriodListCreateView.as_view(), name='period-list'),
-    path('periods/<int:pk>/', views.PayrollPeriodDetailView.as_view(), name='period-detail'),
-    path('periods/<int:pk>/generate/', views.GeneratePayrollView.as_view(), name='generate-payroll'),
-    path('<int:pk>/', views.PayrollDetailView.as_view(), name='payroll-detail'),
-    path('<int:pk>/approve/', views.PayrollApproveView.as_view(), name='payroll-approve'),
+
+    # Supervisor Payroll (monthly salary)
+    path('supervisor/',          views.SupervisorPayrollListCreateView.as_view(), name='supervisor-payroll-list'),
+    path('supervisor/<int:pk>/', views.SupervisorPayrollDetailView.as_view(),     name='supervisor-payroll-detail'),
+
+    # Contractor Payroll (per project)
+    path('contractor/',          views.ContractorPayrollListCreateView.as_view(), name='contractor-payroll-list'),
+    path('contractor/<int:pk>/', views.ContractorPayrollDetailView.as_view(),     name='contractor-payroll-detail'),
+
+    # Labourer Payroll (per period, attendance-based)
+    path('labourer/',                       views.LabourerPayrollListCreateView.as_view(),    name='labourer-payroll-list'),
+    path('labourer/<int:pk>/',              views.LabourerPayrollDetailView.as_view(),        name='labourer-payroll-detail'),
+    path('labourer/<int:pk>/calculate/',    views.LabourerPayrollAutoCalculateView.as_view(), name='labourer-payroll-calculate'),
 ]

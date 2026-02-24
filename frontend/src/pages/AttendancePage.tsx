@@ -1,368 +1,489 @@
 // frontend/src/pages/AttendancePage.tsx — REPLACE ENTIRE FILE
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getAttendance, markAttendance, updateAttendance, getAttendanceSummary } from '../api/attendance';
-import { getLabourers } from '../api/workforce';
+import apiClient from '../api/client';
 import { extractResults } from '../utils/pagination';
-import { Plus, X, Check, Clock, XCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Eye, Plus, X, AlertCircle, UserPlus } from 'lucide-react';
 
-const STATUS_COLORS: Record<string, { bg: string; color: string; label: string }> = {
-  PRESENT:  { bg: 'rgba(22,163,74,0.15)',   color: '#4ade80', label: 'Present'  },
-  ABSENT:   { bg: 'rgba(220,38,38,0.15)',   color: '#f87171', label: 'Absent'   },
-  HALF_DAY: { bg: 'rgba(202,138,4,0.15)',   color: '#facc15', label: 'Half Day' },
-  LEAVE:    { bg: 'rgba(37,99,235,0.15)',   color: '#60a5fa', label: 'Leave'    },
+const today = new Date().toISOString().split('T')[0];
+
+const STATUS_OPTS = ['PRESENT','ABSENT','HALF_DAY','LEAVE'];
+const STATUS_COLOR: Record<string,string> = {
+  PRESENT:'#4ade80', ABSENT:'#f87171', HALF_DAY:'#facc15', LEAVE:'#60a5fa'
+};
+const STATUS_ICON: Record<string,any> = {
+  PRESENT: CheckCircle, ABSENT: XCircle, HALF_DAY: Clock, LEAVE: Eye
 };
 
 const S = {
-  page: { animation: 'pageIn 0.4s cubic-bezier(0.16,1,0.3,1)' } as React.CSSProperties,
-  // header
-  hdr: { display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:32, paddingBottom:24, borderBottom:'1px solid #161616', position:'relative' } as React.CSSProperties,
-  hdrLine: { position:'absolute', bottom:-1, left:0, width:64, height:3, background:'#dc2626' } as React.CSSProperties,
-  title: { fontFamily:"'Barlow Condensed',sans-serif", fontSize:48, fontWeight:900, color:'white', textTransform:'uppercase', letterSpacing:-1, lineHeight:1 } as React.CSSProperties,
-  sub: { fontSize:11, letterSpacing:4, textTransform:'uppercase', color:'#3f3f46', marginBottom:8, fontWeight:600 } as React.CSSProperties,
-  // stats row
-  statsRow: { display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:2, marginBottom:24 } as React.CSSProperties,
-  statBox: { background:'#0d0d0d', border:'1px solid #161616', padding:'20px 22px', position:'relative', overflow:'hidden', transition:'all 0.2s', cursor:'default' } as React.CSSProperties,
-  statLabel: { fontFamily:"'Barlow Condensed',sans-serif", fontSize:9, fontWeight:700, letterSpacing:4, textTransform:'uppercase', color:'#3f3f46', marginBottom:10 } as React.CSSProperties,
-  statVal: { fontFamily:"'Barlow Condensed',sans-serif", fontSize:44, fontWeight:900, color:'white', lineHeight:1, letterSpacing:-2 } as React.CSSProperties,
-  statBar: { position:'absolute', top:0, left:0, right:0, height:2, background:'#dc2626' } as React.CSSProperties,
-  // grid
-  grid: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:24 } as React.CSSProperties,
-  panel: { background:'#0d0d0d', border:'1px solid #161616', padding:24 } as React.CSSProperties,
-  panelHead: { display:'flex', alignItems:'center', gap:12, marginBottom:20 } as React.CSSProperties,
-  panelLine: { width:28, height:2, background:'#dc2626' } as React.CSSProperties,
-  panelTitle: { fontFamily:"'Barlow Condensed',sans-serif", fontSize:11, fontWeight:700, letterSpacing:4, textTransform:'uppercase', color:'#52525b' } as React.CSSProperties,
-  // table
-  tableWrap: { background:'#0d0d0d', border:'1px solid #161616', overflow:'hidden' } as React.CSSProperties,
-  th: { padding:'12px 18px', textAlign:'left' as const, fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, color:'#3f3f46', textTransform:'uppercase' as const, letterSpacing:3 },
-  td: { padding:'13px 18px', fontSize:13, color:'#a1a1aa', borderBottom:'1px solid #111' },
-  // form
-  formOverlay: { position:'fixed' as const, inset:0, background:'rgba(0,0,0,0.85)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:24 },
-  modal: { background:'#0d0d0d', border:'1px solid #1e1e1e', borderTop:'3px solid #dc2626', width:'100%', maxWidth:520, padding:32 },
-  label: { display:'block', fontSize:9, letterSpacing:4, textTransform:'uppercase' as const, color:'#3f3f46', fontWeight:600, marginBottom:8 },
-  input: { width:'100%', background:'#141414', border:'1px solid #1e1e1e', borderBottom:'2px solid #222', color:'white', padding:'12px 14px', fontFamily:"'Barlow',sans-serif", fontSize:14, outline:'none', boxSizing:'border-box' as const },
-  btn: { display:'inline-flex', alignItems:'center', gap:8, background:'#dc2626', color:'white', border:'none', padding:'11px 22px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, fontWeight:700, letterSpacing:3, textTransform:'uppercase' as const, cursor:'pointer', clipPath:'polygon(0 0,92% 0,100% 25%,100% 100%,8% 100%,0 75%)' },
-  btnGhost: { display:'inline-flex', alignItems:'center', gap:8, background:'transparent', color:'#52525b', border:'1px solid #1e1e1e', padding:'10px 20px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:12, fontWeight:700, letterSpacing:3, textTransform:'uppercase' as const, cursor:'pointer' },
+  card:   { background:'#0d0d0d', border:'1px solid #1a1a1a', borderRadius:8, padding:20 } as React.CSSProperties,
+  label:  { display:'block', fontSize:9, letterSpacing:4, textTransform:'uppercase' as const, color:'#71717a', fontWeight:700, marginBottom:8 },
+  input:  { width:'100%', background:'#141414', border:'1px solid #1e1e1e', color:'white', padding:'10px 12px', fontSize:13, outline:'none', boxSizing:'border-box' as const, borderRadius:4 },
+  select: { width:'100%', background:'#141414', border:'1px solid #1e1e1e', color:'white', padding:'10px 12px', fontSize:13, outline:'none', boxSizing:'border-box' as const, borderRadius:4 },
+  btn:    { display:'inline-flex', alignItems:'center', gap:8, background:'#dc2626', color:'white', border:'none', padding:'10px 20px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:12, fontWeight:700, letterSpacing:3, textTransform:'uppercase' as const, cursor:'pointer', borderRadius:6 },
+  btnSm:  { display:'inline-flex', alignItems:'center', gap:6, background:'#141414', color:'#a1a1aa', border:'1px solid #1e1e1e', padding:'6px 12px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, letterSpacing:2, textTransform:'uppercase' as const, cursor:'pointer', borderRadius:5, transition:'all 0.15s' },
+  overlay:{ position:'fixed' as const, inset:0, background:'rgba(0,0,0,0.85)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:24 },
+  modal:  { background:'#0d0d0d', border:'1px solid #1e1e1e', borderTop:'3px solid #dc2626', width:'100%', maxWidth:540, maxHeight:'90vh', overflowY:'auto' as const, padding:28, borderRadius:8 },
 };
 
 export default function AttendancePage() {
   const { user } = useAuth();
-  const [records, setRecords] = useState<any[]>([]);
-  const [labourers, setLabourers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [msg, setMsg] = useState('');
-  const [isErr, setIsErr] = useState(false);
-  const [form, setForm] = useState({ labourer: '', date: new Date().toISOString().slice(0,10), status: 'PRESENT', overtime_hours: '0', notes: '' });
+  const role = user?.role;
 
-  const fetchData = async () => {
+  if (role === 'HR')         return <HRMonitorView />;
+  if (role === 'SUPERVISOR') return <SupervisorAttendanceView />;
+  if (role === 'CONTRACTOR') return <ContractorAttendanceView />;
+  return <div style={{ color:'#52525b', padding:40 }}>Attendance not available for your role.</div>;
+}
+
+// ── HR — Monitoring only ────────────────────────────────────────
+function HRMonitorView() {
+  const [date, setDate]   = useState(today);
+  const [data, setData]   = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const attRes = await getAttendance();
-      setRecords(extractResults<any>(attRes.data));
-      if (user?.role !== 'LABOURER') {
-        const labRes = await getLabourers();
-        setLabourers(extractResults<any>(labRes.data));
-      }
+      const res = await apiClient.get(`/attendance/monitor/?date=${date}`);
+      setData(res.data);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  };
+  }, [date]);
 
-  useEffect(() => { fetchData(); }, []);
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await markAttendance({ ...form, overtime_hours: parseFloat(form.overtime_hours)||0 });
-      setMsg('Attendance recorded successfully.'); setIsErr(false);
-      setShowForm(false); fetchData();
-    } catch (err: any) {
-      const d = err.response?.data;
-      setMsg(d ? Object.entries(d).map(([k,v])=>`${k}: ${Array.isArray(v)?v[0]:v}`).join(' | ') : 'Failed.');
-      setIsErr(true);
-    }
-  };
-
-  const handleApprove = async (id: number) => {
-    try { await updateAttendance(id, { status: 'APPROVED' }); fetchData(); }
-    catch(e) { console.error(e); }
-  };
-
-  // Stats
-  const total    = records.length;
-  const present  = records.filter(r => r.status === 'PRESENT').length;
-  const absent   = records.filter(r => r.status === 'ABSENT').length;
-  const halfday  = records.filter(r => r.status === 'HALF_DAY').length;
-  const leave    = records.filter(r => r.status === 'LEAVE').length;
-  const pending  = records.filter(r => r.approval_status === 'PENDING').length;
-  const approved = records.filter(r => r.approval_status === 'APPROVED').length;
-  const totalOT  = records.reduce((s,r) => s + parseFloat(r.overtime_hours||0), 0);
-
-  // Bar chart data — last 7 days
-  const last7 = Array.from({length:7}, (_,i) => {
-    const d = new Date(); d.setDate(d.getDate() - (6-i));
-    const ds = d.toISOString().slice(0,10);
-    const dayRecs = records.filter(r => r.date === ds);
-    return {
-      day: d.toLocaleDateString('en',{weekday:'short'}),
-      present: dayRecs.filter(r=>r.status==='PRESENT').length,
-      absent:  dayRecs.filter(r=>r.status==='ABSENT').length,
-      total:   dayRecs.length,
-    };
-  });
-  const maxBar = Math.max(...last7.map(d=>d.total), 1);
-
-  // Donut chart percentages
-  const donutData = [
-    { label:'Present', val: total ? Math.round(present/total*100) : 0, color:'#4ade80' },
-    { label:'Absent',  val: total ? Math.round(absent/total*100)  : 0, color:'#f87171' },
-    { label:'Half Day',val: total ? Math.round(halfday/total*100) : 0, color:'#facc15' },
-    { label:'Leave',   val: total ? Math.round(leave/total*100)   : 0, color:'#60a5fa' },
-  ];
-
-  // SVG donut
-  const r = 54, cx = 70, cy = 70, stroke = 18;
-  const circ = 2 * Math.PI * r;
-  let offset = 0;
-  const segments = donutData.map(d => {
-    const dash = (d.val / 100) * circ;
-    const seg = { ...d, dash, offset, gap: circ - dash };
-    offset += dash;
-    return seg;
-  });
+  useEffect(() => { load(); }, [load]);
 
   return (
-    <>
-      <style>{`
-        @keyframes pageIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
-        .att-stat:hover { background:#111!important; border-color:#1e1e1e!important; transform:translateY(-2px); }
-        .att-row:hover td { background:#111; }
-        .att-input:focus { border-bottom-color:#dc2626!important; background:#181818!important; }
-        select option { background:#141414; color:white; }
-      `}</style>
+    <div style={{ animation:'pageIn 0.4s ease' }}>
+      <style>{`@keyframes pageIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
 
-      <div style={S.page}>
-        {/* Header */}
-        <div style={S.hdr}>
-          <div style={S.hdrLine}/>
-          <div>
-            <div style={S.sub}>Workforce</div>
-            <div style={S.title}>Attendance</div>
-          </div>
-          {(user?.role==='HR'||user?.role==='SUPERVISOR') && (
-            <button style={S.btn} onClick={()=>setShowForm(true)}>
-              <Plus size={14}/> Mark Attendance
-            </button>
-          )}
+      {/* Header */}
+      <div style={{ marginBottom:28, paddingBottom:20, borderBottom:'1px solid #161616', position:'relative' }}>
+        <div style={{ position:'absolute', bottom:-1, left:0, width:64, height:3, background:'#dc2626', borderRadius:2 }}/>
+        <div style={{ fontSize:10, letterSpacing:4, textTransform:'uppercase', color:'#71717a', marginBottom:4, fontWeight:600 }}>Monitoring</div>
+        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:40, fontWeight:900, color:'white', textTransform:'uppercase', letterSpacing:-1 }}>Attendance Overview</div>
+      </div>
+
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:24 }}>
+        <div>
+          <label style={S.label}>Date</label>
+          <input type="date" style={{ ...S.input, width:180 }} value={date} onChange={e => setDate(e.target.value)}/>
         </div>
+        <button style={{ ...S.btn, marginTop:20 }} onClick={load}>Refresh</button>
+      </div>
 
-        {msg && (
-          <div style={{ background: isErr?'rgba(220,38,38,0.07)':'rgba(22,163,74,0.07)', borderLeft:`3px solid ${isErr?'#dc2626':'#16a34a'}`, padding:'12px 16px', marginBottom:20, fontSize:13, color: isErr?'#fca5a5':'#4ade80' }}>
-            {msg}
-          </div>
-        )}
-
-        {/* Stats */}
-        <div style={S.statsRow}>
-          {[
-            { label:'Total Records', val: total,    color:'#dc2626' },
-            { label:'Present',       val: present,  color:'#4ade80' },
-            { label:'Absent',        val: absent,   color:'#f87171' },
-            { label:'Overtime hrs',  val: Math.round(totalOT), color:'#facc15' },
-          ].map(s => (
-            <div key={s.label} className="att-stat" style={{...S.statBox}}>
-              <div style={{...S.statBar, background:s.color}}/>
-              <div style={S.statLabel}>{s.label}</div>
-              <div style={{...S.statVal, color:s.color}}>{s.val}</div>
+      {loading ? (
+        <div style={{ color:'#52525b', padding:40 }}>Loading...</div>
+      ) : data.length === 0 ? (
+        <div style={{ ...S.card, color:'#3f3f46', textAlign:'center', padding:60 }}>No active projects found.</div>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          {data.map((d: any) => (
+            <div key={d.project_id} style={{ ...S.card, borderLeft:'3px solid #dc2626' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
+                <div>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:800, color:'white', textTransform:'uppercase' }}>{d.project_name}</div>
+                  <div style={{ fontSize:12, color:'#71717a', marginTop:2 }}>Supervisor: <span style={{ color:'#a1a1aa' }}>{d.supervisor_name}</span></div>
+                </div>
+                <div style={{ fontSize:11, color:'#52525b' }}>{d.date}</div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <MonitorCard label="Contractor Attendance" marked={d.contractors_marked} total={d.contractors_total} color="#facc15"/>
+                <MonitorCard label="Labourer Attendance"   marked={d.labourers_marked}  total={d.labourers_total}  color="#4ade80"/>
+              </div>
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
 
-        {/* Charts row */}
-        <div style={S.grid}>
-          {/* Bar chart */}
-          <div style={S.panel}>
-            <div style={S.panelHead}>
-              <div style={S.panelLine}/>
-              <div style={S.panelTitle}>7-Day Attendance</div>
-            </div>
-            <div style={{ display:'flex', alignItems:'flex-end', gap:8, height:120 }}>
-              {last7.map(d => (
-                <div key={d.day} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
-                  <div style={{ width:'100%', display:'flex', flexDirection:'column', gap:2, height:100, justifyContent:'flex-end' }}>
-                    <div style={{ width:'100%', background:'#4ade80', height: maxBar ? `${(d.present/maxBar)*90}px` : 0, transition:'height 0.5s', minHeight: d.present?2:0 }}/>
-                    <div style={{ width:'100%', background:'#f87171', height: maxBar ? `${(d.absent/maxBar)*90}px` : 0, transition:'height 0.5s', minHeight: d.absent?2:0 }}/>
-                  </div>
-                  <div style={{ fontSize:10, color:'#3f3f46', letterSpacing:1 }}>{d.day}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ display:'flex', gap:16, marginTop:12 }}>
-              {[['#4ade80','Present'],['#f87171','Absent']].map(([c,l])=>(
-                <div key={l} style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <div style={{ width:10, height:10, background:c }}/>
-                  <span style={{ fontSize:10, color:'#52525b', letterSpacing:2, textTransform:'uppercase' }}>{l}</span>
-                </div>
-              ))}
-            </div>
+function MonitorCard({ label, marked, total, color }: any) {
+  const pct = total > 0 ? Math.round((marked / total) * 100) : 0;
+  const ok  = marked >= total && total > 0;
+  return (
+    <div style={{ background:'#111', border:`1px solid ${ok ? color + '30' : '#1a1a1a'}`, borderRadius:6, padding:16 }}>
+      <div style={{ fontSize:10, letterSpacing:3, textTransform:'uppercase', color:'#52525b', fontWeight:700, marginBottom:8 }}>{label}</div>
+      <div style={{ display:'flex', alignItems:'baseline', gap:6, marginBottom:8 }}>
+        <span style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:28, fontWeight:900, color }}>{marked}</span>
+        <span style={{ fontSize:13, color:'#3f3f46' }}>/ {total}</span>
+        <span style={{ fontSize:11, color: ok ? '#4ade80' : '#f87171', marginLeft:'auto', fontWeight:700 }}>{pct}%</span>
+      </div>
+      <div style={{ height:4, background:'#1a1a1a', borderRadius:2, overflow:'hidden' }}>
+        <div style={{ height:'100%', width:`${pct}%`, background: ok ? '#4ade80' : color, borderRadius:2, transition:'width 0.5s ease' }}/>
+      </div>
+    </div>
+  );
+}
+
+// ── SUPERVISOR — marks Contractor attendance ────────────────────
+function SupervisorAttendanceView() {
+  const [projects, setProjects]     = useState<any[]>([]);
+  const [selectedProject, setSelectedProject] = useState('');
+  const [date, setDate]             = useState(today);
+  const [contractors, setContractors] = useState<any[]>([]);
+  const [attendance, setAttendance] = useState<Record<number, string>>({});
+  const [saving, setSaving]         = useState(false);
+  const [msg, setMsg]               = useState('');
+
+  useEffect(() => {
+    apiClient.get('/attendance/projects/').then(r => {
+      const p = extractResults<any>(r.data);
+      setProjects(p);
+      if (p.length > 0) setSelectedProject(String(p[0].id));
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!selectedProject) return;
+    // Load contractors for this project's supervisor
+    apiClient.get(`/workforce/contractors/?supervisor_project=${selectedProject}`).then(r => {
+      const list = extractResults<any>(r.data);
+      setContractors(list);
+      // Initialise attendance map
+      const init: Record<number,string> = {};
+      list.forEach((c: any) => { init[c.id] = 'PRESENT'; });
+      setAttendance(init);
+    }).catch(() => {
+      // fallback: load all contractors
+      apiClient.get('/workforce/contractors/').then(r => {
+        const list = extractResults<any>(r.data);
+        setContractors(list);
+        const init: Record<number,string> = {};
+        list.forEach((c: any) => { init[c.id] = 'PRESENT'; });
+        setAttendance(init);
+      });
+    });
+    // Pre-fill existing records
+    apiClient.get(`/attendance/contractor-attendance/?project=${selectedProject}&date=${date}`).then(r => {
+      const records = extractResults<any>(r.data);
+      const map: Record<number,string> = {};
+      records.forEach((rec: any) => { map[rec.contractor] = rec.status; });
+      setAttendance(prev => ({ ...prev, ...map }));
+    });
+  }, [selectedProject, date]);
+
+  const handleSave = async () => {
+    if (!selectedProject) return;
+    setSaving(true); setMsg('');
+    try {
+      const records = contractors.map(c => ({
+        contractor: c.id,
+        project:    parseInt(selectedProject),
+        date,
+        status:     attendance[c.id] || 'PRESENT',
+      }));
+      await apiClient.post('/attendance/contractor-attendance/bulk/', { records });
+      setMsg('Attendance saved successfully!');
+    } catch (e) {
+      setMsg('Failed to save. Please try again.');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div style={{ animation:'pageIn 0.4s ease' }}>
+      <div style={{ marginBottom:28, paddingBottom:20, borderBottom:'1px solid #161616', position:'relative' }}>
+        <div style={{ position:'absolute', bottom:-1, left:0, width:64, height:3, background:'#dc2626', borderRadius:2 }}/>
+        <div style={{ fontSize:10, letterSpacing:4, textTransform:'uppercase', color:'#71717a', marginBottom:4, fontWeight:600 }}>Supervisor Portal</div>
+        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:40, fontWeight:900, color:'white', textTransform:'uppercase', letterSpacing:-1 }}>Contractor Attendance</div>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr auto', gap:12, marginBottom:24, alignItems:'end' }}>
+        <div>
+          <label style={S.label}>Project</label>
+          <select style={S.select} value={selectedProject} onChange={e => setSelectedProject(e.target.value)}>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={S.label}>Date</label>
+          <input type="date" style={S.input} value={date} onChange={e => setDate(e.target.value)}/>
+        </div>
+        <button style={S.btn} onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : 'Save Attendance'}
+        </button>
+      </div>
+
+      {msg && (
+        <div style={{ background: msg.includes('success') ? 'rgba(22,163,74,0.07)' : 'rgba(220,38,38,0.07)', borderLeft:`3px solid ${msg.includes('success') ? '#16a34a' : '#dc2626'}`, padding:'10px 16px', marginBottom:20, fontSize:13, color: msg.includes('success') ? '#4ade80' : '#fca5a5', borderRadius:4 }}>
+          {msg}
+        </div>
+      )}
+
+      {/* Attendance table */}
+      {contractors.length === 0 ? (
+        <div style={{ ...S.card, color:'#3f3f46', textAlign:'center', padding:60 }}>No contractors assigned to your projects.</div>
+      ) : (
+        <div style={{ ...S.card, padding:0, overflow:'hidden' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'40px 1fr repeat(4,1fr)', padding:'10px 16px', background:'#0a0a0a', borderBottom:'1px solid #1a1a1a', gap:8 }}>
+            {['#','Contractor',...STATUS_OPTS].map(h => (
+              <span key={h} style={{ fontSize:9, letterSpacing:3, textTransform:'uppercase', color:'#3f3f46', fontWeight:700 }}>{h}</span>
+            ))}
           </div>
-
-          {/* Donut chart */}
-          <div style={S.panel}>
-            <div style={S.panelHead}>
-              <div style={S.panelLine}/>
-              <div style={S.panelTitle}>Status Breakdown</div>
-            </div>
-            <div style={{ display:'flex', alignItems:'center', gap:28 }}>
-              <svg width={140} height={140} viewBox="0 0 140 140">
-                <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1a1a1a" strokeWidth={stroke}/>
-                {total===0 ? (
-                  <circle cx={cx} cy={cy} r={r} fill="none" stroke="#222" strokeWidth={stroke}/>
-                ) : segments.map((s,i) => (
-                  <circle key={i} cx={cx} cy={cy} r={r} fill="none"
-                    stroke={s.color} strokeWidth={stroke}
-                    strokeDasharray={`${s.dash} ${s.gap}`}
-                    strokeDashoffset={-s.offset}
-                    transform={`rotate(-90 ${cx} ${cy})`}
-                    style={{ transition:'stroke-dasharray 0.5s' }}
-                  />
-                ))}
-                <text x={cx} y={cy-6} textAnchor="middle" fill="white"
-                  style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:22, fontWeight:900 }}>{total}</text>
-                <text x={cx} y={cy+12} textAnchor="middle" fill="#3f3f46"
-                  style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:9, letterSpacing:2 }}>TOTAL</text>
-              </svg>
-              <div style={{ flex:1 }}>
-                {donutData.map(d => (
-                  <div key={d.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 0', borderBottom:'1px solid #111' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <div style={{ width:8, height:8, background:d.color }}/>
-                      <span style={{ fontSize:11, color:'#52525b', textTransform:'uppercase', letterSpacing:2, fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700 }}>{d.label}</span>
-                    </div>
-                    <span style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:18, fontWeight:900, color:d.color }}>{d.val}<span style={{fontSize:11,color:'#3f3f46'}}>%</span></span>
-                  </div>
-                ))}
+          {contractors.map((c, i) => (
+            <div key={c.id} style={{ display:'grid', gridTemplateColumns:'40px 1fr repeat(4,1fr)', padding:'14px 16px', background: i%2===0 ? '#0d0d0d':'#0a0a0a', borderBottom:'1px solid #111', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:11, color:'#3f3f46', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700 }}>{String(i+1).padStart(2,'0')}</span>
+              <div>
+                <div style={{ fontWeight:600, color:'white', fontSize:13 }}>{c.user_detail?.first_name} {c.user_detail?.last_name || c.user_detail?.username}</div>
+                <div style={{ fontSize:11, color:'#52525b' }}>{c.company_name || ''}</div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Approval stats */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:2, marginBottom:24 }}>
-          <div style={{ background:'rgba(22,163,74,0.06)', border:'1px solid rgba(22,163,74,0.15)', padding:'16px 20px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <span style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, letterSpacing:4, textTransform:'uppercase', color:'#3f3f46' }}>Approved Records</span>
-            <span style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:32, fontWeight:900, color:'#4ade80' }}>{approved}</span>
-          </div>
-          <div style={{ background:'rgba(220,38,38,0.06)', border:'1px solid rgba(220,38,38,0.15)', padding:'16px 20px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <span style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, letterSpacing:4, textTransform:'uppercase', color:'#3f3f46' }}>Pending Approval</span>
-            <span style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:32, fontWeight:900, color:'#f87171' }}>{pending}</span>
-          </div>
-        </div>
-
-        {/* Table */}
-        <div style={S.panelHead}>
-          <div style={S.panelLine}/>
-          <div style={S.panelTitle}>All Records</div>
-        </div>
-        <div style={S.tableWrap}>
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
-            <thead>
-              <tr style={{ background:'#0a0a0a', borderBottom:'1px solid #1a1a1a' }}>
-                {['Labourer','Date','Status','OT hrs','Approval','Action'].map(h=>(
-                  <th key={h} style={S.th}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={6} style={{ padding:40, textAlign:'center', color:'#3f3f46', fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:4, textTransform:'uppercase', fontSize:12 }}>Loading...</td></tr>
-              ) : records.length===0 ? (
-                <tr><td colSpan={6} style={{ padding:60, textAlign:'center', color:'#27272a', fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:4, textTransform:'uppercase', fontSize:14 }}>No Records Found</td></tr>
-              ) : records.map(r => {
-                const sc = STATUS_COLORS[r.status] || { bg:'rgba(82,82,91,0.3)', color:'#a1a1aa', label: r.status };
+              {STATUS_OPTS.map(s => {
+                const active = attendance[c.id] === s;
                 return (
-                  <tr key={r.id} className="att-row">
-                    <td style={S.td}>{r.labourer_detail?.user_detail?.first_name || r.labourer_detail?.user_detail?.username || r.labourer}</td>
-                    <td style={{...S.td, color:'white', fontWeight:600}}>{r.date}</td>
-                    <td style={S.td}>
-                      <span style={{ background:sc.bg, color:sc.color, padding:'3px 10px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, letterSpacing:2, textTransform:'uppercase' }}>{sc.label}</span>
-                    </td>
-                    <td style={{...S.td, color:r.overtime_hours>0?'#facc15':'#3f3f46'}}>{r.overtime_hours}h</td>
-                    <td style={S.td}>
-                      <span style={{ background: r.approval_status==='APPROVED'?'rgba(22,163,74,0.15)':'rgba(220,38,38,0.1)', color: r.approval_status==='APPROVED'?'#4ade80':'#f87171', padding:'3px 10px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, letterSpacing:2, textTransform:'uppercase' }}>
-                        {r.approval_status}
-                      </span>
-                    </td>
-                    <td style={S.td}>
-                      {r.approval_status!=='APPROVED' && (user?.role==='HR'||user?.role==='SUPERVISOR') && (
-                        <button onClick={()=>handleApprove(r.id)} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 12px', background:'rgba(22,163,74,0.1)', color:'#4ade80', border:'1px solid rgba(22,163,74,0.2)', fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, letterSpacing:2, textTransform:'uppercase', cursor:'pointer' }}>
-                          <Check size={11}/> Approve
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                  <button key={s} onClick={() => setAttendance(prev => ({ ...prev, [c.id]: s }))}
+                    style={{ padding:'7px 0', background: active ? `${STATUS_COLOR[s]}15` : '#141414', border:`1px solid ${active ? STATUS_COLOR[s] : '#1e1e1e'}`, borderRadius:5, color: active ? STATUS_COLOR[s] : '#52525b', fontSize:10, fontWeight:700, letterSpacing:1, textTransform:'uppercase', cursor:'pointer', transition:'all 0.15s' }}>
+                    {s.replace('_',' ')}
+                  </button>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── CONTRACTOR — marks Labourer attendance (fixed + temp) ───────
+function ContractorAttendanceView() {
+  const [projects, setProjects]     = useState<any[]>([]);
+  const [selectedProject, setSelectedProject] = useState('');
+  const [date, setDate]             = useState(today);
+  const [labourers, setLabourers]   = useState<any[]>([]);
+  const [tempLabourers, setTempLabourers] = useState<any[]>([]);
+  const [attendance, setAttendance] = useState<Record<string, {status:string; ot:string}>>({});
+  const [saving, setSaving]         = useState(false);
+  const [msg, setMsg]               = useState('');
+  const [showTempForm, setShowTempForm] = useState(false);
+  const [tempForm, setTempForm]     = useState({ name:'', phone:'', skill:'', daily_wage:'0' });
+  const [myContractorId, setMyContractorId] = useState<number|null>(null);
+
+  useEffect(() => {
+    apiClient.get('/attendance/projects/').then(r => {
+      const p = extractResults<any>(r.data);
+      setProjects(p);
+      if (p.length > 0) setSelectedProject(String(p[0].id));
+    });
+    apiClient.get('/workforce/contractors/?me=true').then(r => {
+      const list = extractResults<any>(r.data);
+      if (list.length > 0) setMyContractorId(list[0].id);
+    }).catch(() => {
+      apiClient.get('/workforce/contractors/').then(r => {
+        const list = extractResults<any>(r.data);
+        if (list.length > 0) setMyContractorId(list[0].id);
+      });
+    });
+  }, []);
+
+  const loadLabourers = useCallback(async () => {
+    if (!selectedProject) return;
+    try {
+      const [labRes, tempRes, attRes] = await Promise.all([
+        apiClient.get('/workforce/labourers/'),
+        apiClient.get('/attendance/temp-labourers/'),
+        apiClient.get(`/attendance/labourer-attendance/?project=${selectedProject}&date=${date}`),
+      ]);
+      const labs = extractResults<any>(labRes.data);
+      const temps = extractResults<any>(tempRes.data);
+      const atts  = extractResults<any>(attRes.data);
+
+      setLabourers(labs);
+      setTempLabourers(temps);
+
+      const init: Record<string,{status:string;ot:string}> = {};
+      labs.forEach((l: any)  => { init[`l-${l.id}`]  = { status:'PRESENT', ot:'0' }; });
+      temps.forEach((t: any) => { init[`t-${t.id}`]  = { status:'PRESENT', ot:'0' }; });
+      // Override with existing
+      atts.forEach((a: any) => {
+        const key = a.labourer ? `l-${a.labourer}` : `t-${a.temp_labourer}`;
+        init[key] = { status: a.status, ot: String(a.overtime_hours) };
+      });
+      setAttendance(init);
+    } catch (e) { console.error(e); }
+  }, [selectedProject, date]);
+
+  useEffect(() => { loadLabourers(); }, [loadLabourers]);
+
+  const setAtt = (key: string, field: 'status'|'ot', value: string) => {
+    setAttendance(prev => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
+  };
+
+  const handleSave = async () => {
+    if (!selectedProject) return;
+    setSaving(true); setMsg('');
+    try {
+      const records: any[] = [
+        ...labourers.map(l => ({
+          labourer: l.id,
+          project: parseInt(selectedProject),
+          date,
+          status: attendance[`l-${l.id}`]?.status || 'PRESENT',
+          overtime_hours: parseFloat(attendance[`l-${l.id}`]?.ot || '0'),
+        })),
+        ...tempLabourers.map(t => ({
+          temp_labourer: t.id,
+          project: parseInt(selectedProject),
+          date,
+          status: attendance[`t-${t.id}`]?.status || 'PRESENT',
+          overtime_hours: parseFloat(attendance[`t-${t.id}`]?.ot || '0'),
+        })),
+      ];
+      await apiClient.post('/attendance/labourer-attendance/bulk/', { records });
+      setMsg('Attendance saved!');
+    } catch (e) { setMsg('Save failed.'); }
+    finally { setSaving(false); }
+  };
+
+  const handleAddTemp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!myContractorId) return;
+    try {
+      await apiClient.post('/attendance/temp-labourers/', { ...tempForm, contractor: myContractorId, daily_wage: parseFloat(tempForm.daily_wage) });
+      setShowTempForm(false);
+      setTempForm({ name:'', phone:'', skill:'', daily_wage:'0' });
+      loadLabourers();
+    } catch (e) { alert('Failed to add temp labourer.'); }
+  };
+
+  const AttRow = ({ label, keyPrefix, id, isTemp }: any) => (
+    <div style={{ display:'grid', gridTemplateColumns:'40px 1.5fr repeat(4,1fr) 80px', padding:'13px 16px', background:'#0d0d0d', borderBottom:'1px solid #111', alignItems:'center', gap:8 }}>
+      <span style={{ fontSize:10, color:'#3f3f46', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700 }}>{isTemp ? 'T' : 'F'}</span>
+      <div>
+        <div style={{ fontWeight:600, color:'white', fontSize:13 }}>{label}</div>
+        {isTemp && <span style={{ fontSize:9, color:'#facc15', background:'rgba(202,138,4,0.1)', padding:'1px 6px', borderRadius:8, letterSpacing:1, fontWeight:700 }}>TEMP</span>}
+      </div>
+      {STATUS_OPTS.map(s => {
+        const k = `${keyPrefix}-${id}`;
+        const active = attendance[k]?.status === s;
+        return (
+          <button key={s} onClick={() => setAtt(k,'status',s)}
+            style={{ padding:'6px 0', background: active ? `${STATUS_COLOR[s]}15` : '#141414', border:`1px solid ${active ? STATUS_COLOR[s] : '#1e1e1e'}`, borderRadius:5, color: active ? STATUS_COLOR[s] : '#52525b', fontSize:9, fontWeight:700, letterSpacing:1, textTransform:'uppercase', cursor:'pointer', transition:'all 0.15s' }}>
+            {s.replace('_',' ')}
+          </button>
+        );
+      })}
+      <input type="number" min="0" step="0.5" placeholder="OT hrs"
+        style={{ ...S.input, padding:'6px 8px', fontSize:12 }}
+        value={attendance[`${keyPrefix}-${id}`]?.ot || '0'}
+        onChange={e => setAtt(`${keyPrefix}-${id}`,'ot',e.target.value)}/>
+    </div>
+  );
+
+  return (
+    <div style={{ animation:'pageIn 0.4s ease' }}>
+      <div style={{ marginBottom:28, paddingBottom:20, borderBottom:'1px solid #161616', position:'relative' }}>
+        <div style={{ position:'absolute', bottom:-1, left:0, width:64, height:3, background:'#dc2626', borderRadius:2 }}/>
+        <div style={{ fontSize:10, letterSpacing:4, textTransform:'uppercase', color:'#71717a', marginBottom:4, fontWeight:600 }}>Contractor Portal</div>
+        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:40, fontWeight:900, color:'white', textTransform:'uppercase', letterSpacing:-1 }}>Labourer Attendance</div>
+      </div>
+
+      {/* Filters + actions */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr auto auto', gap:12, marginBottom:24, alignItems:'end' }}>
+        <div>
+          <label style={S.label}>Project</label>
+          <select style={S.select} value={selectedProject} onChange={e => setSelectedProject(e.target.value)}>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={S.label}>Date</label>
+          <input type="date" style={S.input} value={date} onChange={e => setDate(e.target.value)}/>
+        </div>
+        <button style={{ ...S.btn, background:'#1e3a1e', border:'1px solid #16a34a', color:'#4ade80' }} onClick={() => setShowTempForm(true)}>
+          <UserPlus size={13}/> Add Temp
+        </button>
+        <button style={S.btn} onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+      </div>
+
+      {msg && (
+        <div style={{ background: msg.includes('success') || msg === 'Attendance saved!' ? 'rgba(22,163,74,0.07)' : 'rgba(220,38,38,0.07)', borderLeft:`3px solid ${msg.includes('saved') ? '#16a34a' : '#dc2626'}`, padding:'10px 16px', marginBottom:20, fontSize:13, color: msg.includes('saved') ? '#4ade80' : '#fca5a5', borderRadius:4 }}>
+          {msg}
+        </div>
+      )}
+
+      {/* Table */}
+      <div style={{ ...S.card, padding:0, overflow:'hidden' }}>
+        {/* Column headers */}
+        <div style={{ display:'grid', gridTemplateColumns:'40px 1.5fr repeat(4,1fr) 80px', padding:'10px 16px', background:'#0a0a0a', borderBottom:'1px solid #1a1a1a', gap:8 }}>
+          <span style={{ fontSize:9, letterSpacing:3, color:'#3f3f46', fontWeight:700 }}>TYPE</span>
+          <span style={{ fontSize:9, letterSpacing:3, color:'#3f3f46', fontWeight:700 }}>NAME</span>
+          {STATUS_OPTS.map(s => <span key={s} style={{ fontSize:9, letterSpacing:2, color:`${STATUS_COLOR[s]}80`, fontWeight:700, textTransform:'uppercase' }}>{s.replace('_',' ')}</span>)}
+          <span style={{ fontSize:9, letterSpacing:3, color:'#3f3f46', fontWeight:700 }}>OT HRS</span>
         </div>
 
-        {/* Create Modal */}
-        {showForm && (
-          <div style={S.formOverlay}>
-            <div style={S.modal}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24, paddingBottom:20, borderBottom:'1px solid #1a1a1a' }}>
-                <div>
-                  <div style={{ fontSize:9, letterSpacing:5, textTransform:'uppercase', color:'#dc2626', fontWeight:600, marginBottom:4 }}>Record</div>
-                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:28, fontWeight:900, color:'white', textTransform:'uppercase', letterSpacing:-1 }}>Mark Attendance</div>
-                </div>
-                <button onClick={()=>setShowForm(false)} style={{ background:'#1a1a1a', border:'1px solid #222', color:'#52525b', width:32, height:32, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-                  <X size={16}/>
-                </button>
-              </div>
-              <form onSubmit={handleCreate}>
-                <div style={{ marginBottom:18 }}>
-                  <label style={S.label}>Labourer</label>
-                  <select className="att-input" style={S.input} value={form.labourer} onChange={e=>setForm({...form,labourer:e.target.value})} required>
-                    <option value="">Select labourer</option>
-                    {labourers.map(l=>(
-                      <option key={l.id} value={l.id}>{l.user_detail?.first_name} {l.user_detail?.last_name||l.user_detail?.username}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:18 }}>
-                  <div>
-                    <label style={S.label}>Date</label>
-                    <input className="att-input" style={S.input} type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} required/>
-                  </div>
-                  <div>
-                    <label style={S.label}>Status</label>
-                    <select className="att-input" style={S.input} value={form.status} onChange={e=>setForm({...form,status:e.target.value})}>
-                      <option value="PRESENT">Present</option>
-                      <option value="ABSENT">Absent</option>
-                      <option value="HALF_DAY">Half Day</option>
-                      <option value="LEAVE">Leave</option>
-                    </select>
-                  </div>
-                </div>
-                <div style={{ marginBottom:18 }}>
-                  <label style={S.label}>Overtime Hours</label>
-                  <input className="att-input" style={S.input} type="number" min="0" step="0.5" value={form.overtime_hours} onChange={e=>setForm({...form,overtime_hours:e.target.value})}/>
-                </div>
-                <div style={{ marginBottom:24 }}>
-                  <label style={S.label}>Notes</label>
-                  <input className="att-input" style={S.input} type="text" placeholder="Optional notes" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/>
-                </div>
-                <div style={{ display:'flex', gap:12 }}>
-                  <button type="submit" style={S.btn}>Record Attendance</button>
-                  <button type="button" style={S.btnGhost} onClick={()=>setShowForm(false)}>Cancel</button>
-                </div>
-              </form>
+        {/* Fixed labourers */}
+        {labourers.length > 0 && (
+          <>
+            <div style={{ padding:'8px 16px', background:'rgba(74,222,128,0.04)', borderBottom:'1px solid #111' }}>
+              <span style={{ fontSize:9, color:'#4ade80', letterSpacing:3, fontWeight:700, textTransform:'uppercase' }}>Fixed Labourers ({labourers.length})</span>
             </div>
-          </div>
+            {labourers.map((l: any) => (
+              <AttRow key={l.id} label={`${l.user_detail?.first_name||''} ${l.user_detail?.last_name||l.user_detail?.username}`} keyPrefix="l" id={l.id} isTemp={false}/>
+            ))}
+          </>
+        )}
+
+        {/* Temp labourers */}
+        {tempLabourers.length > 0 && (
+          <>
+            <div style={{ padding:'8px 16px', background:'rgba(202,138,4,0.04)', borderBottom:'1px solid #111' }}>
+              <span style={{ fontSize:9, color:'#facc15', letterSpacing:3, fontWeight:700, textTransform:'uppercase' }}>Temporary Labourers ({tempLabourers.length})</span>
+            </div>
+            {tempLabourers.map((t: any) => (
+              <AttRow key={t.id} label={t.name} keyPrefix="t" id={t.id} isTemp={true}/>
+            ))}
+          </>
+        )}
+
+        {labourers.length === 0 && tempLabourers.length === 0 && (
+          <div style={{ padding:60, textAlign:'center', color:'#3f3f46' }}>No labourers found. Add temporary labourers using the button above.</div>
         )}
       </div>
-    </>
+
+      {/* Add Temp Modal */}
+      {showTempForm && (
+        <div style={S.overlay}>
+          <div style={S.modal}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, paddingBottom:16, borderBottom:'1px solid #1a1a1a' }}>
+              <div>
+                <div style={{ fontSize:9, color:'#facc15', letterSpacing:4, fontWeight:700, textTransform:'uppercase', marginBottom:4 }}>Temporary Labour</div>
+                <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:24, fontWeight:900, color:'white', textTransform:'uppercase' }}>Add Temp Labourer</div>
+              </div>
+              <button onClick={() => setShowTempForm(false)} style={{ background:'#1a1a1a', border:'1px solid #222', color:'#a1a1aa', width:30, height:30, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', borderRadius:5 }}>
+                <X size={14}/>
+              </button>
+            </div>
+            <form onSubmit={handleAddTemp}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
+                <div>
+                  <label style={S.label}>Full Name *</label>
+                  <input style={S.input} type="text" required value={tempForm.name} onChange={e => setTempForm({...tempForm, name:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>Phone</label>
+                  <input style={S.input} type="text" value={tempForm.phone} onChange={e => setTempForm({...tempForm, phone:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>Skill</label>
+                  <input style={S.input} type="text" placeholder="e.g. Mason" value={tempForm.skill} onChange={e => setTempForm({...tempForm, skill:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>Daily Wage (₹)</label>
+                  <input style={S.input} type="number" min="0" step="0.01" value={tempForm.daily_wage} onChange={e => setTempForm({...tempForm, daily_wage:e.target.value})}/>
+                </div>
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <button type="submit" style={S.btn}>Add Labourer</button>
+                <button type="button" onClick={() => setShowTempForm(false)} style={{ ...S.btn, background:'transparent', border:'1px solid #1e1e1e', color:'#a1a1aa' }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

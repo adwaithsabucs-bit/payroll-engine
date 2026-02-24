@@ -1,10 +1,9 @@
+# attendance/admin.py
 from django.contrib import admin
-from .models import Attendance
+from .models import Project, Period, TemporaryLabourer, ContractorAttendance, LabourerAttendance
 
-
-@admin.register(Attendance)
-class AttendanceAdmin(admin.ModelAdmin):
-    list_display = ['labourer', 'date', 'status', 'overtime_hours', 'approval_status', 'marked_by']
-    list_filter = ['status', 'approval_status', 'date']
-    search_fields = ['labourer__user__username']
-    date_hierarchy = 'date'
+admin.site.register(Project)
+admin.site.register(Period)
+admin.site.register(TemporaryLabourer)
+admin.site.register(ContractorAttendance)
+admin.site.register(LabourerAttendance)

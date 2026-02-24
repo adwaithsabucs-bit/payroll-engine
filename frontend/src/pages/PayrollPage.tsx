@@ -1,372 +1,579 @@
 // frontend/src/pages/PayrollPage.tsx — REPLACE ENTIRE FILE
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getPayrolls, getPeriods, createPeriod, generatePayroll, approvePayroll } from '../api/payroll';
+import apiClient from '../api/client';
 import { extractResults } from '../utils/pagination';
-import { Plus, X, Zap, Check } from 'lucide-react';
-
-const PAY_STATUS: Record<string, { bg: string; color: string }> = {
-  PENDING:  { bg:'rgba(202,138,4,0.12)',  color:'#facc15' },
-  APPROVED: { bg:'rgba(22,163,74,0.12)',  color:'#4ade80' },
-  PAID:     { bg:'rgba(37,99,235,0.12)',  color:'#60a5fa' },
-};
+import { Plus, X, CheckCircle, Clock, DollarSign, ChevronRight, RefreshCw } from 'lucide-react';
 
 const S = {
-  page: { animation:'pageIn 0.4s cubic-bezier(0.16,1,0.3,1)' } as React.CSSProperties,
-  hdr: { display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:32, paddingBottom:24, borderBottom:'1px solid #161616', position:'relative' } as React.CSSProperties,
-  hdrLine: { position:'absolute', bottom:-1, left:0, width:64, height:3, background:'#dc2626' } as React.CSSProperties,
-  title: { fontFamily:"'Barlow Condensed',sans-serif", fontSize:48, fontWeight:900, color:'white', textTransform:'uppercase', letterSpacing:-1, lineHeight:1 } as React.CSSProperties,
-  sub: { fontSize:11, letterSpacing:4, textTransform:'uppercase', color:'#3f3f46', marginBottom:8, fontWeight:600 } as React.CSSProperties,
-  statsRow: { display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:2, marginBottom:24 } as React.CSSProperties,
-  statBox: { background:'#0d0d0d', border:'1px solid #161616', padding:'22px 24px', position:'relative', overflow:'hidden', transition:'all 0.2s' } as React.CSSProperties,
-  statLabel: { fontFamily:"'Barlow Condensed',sans-serif", fontSize:9, fontWeight:700, letterSpacing:4, textTransform:'uppercase', color:'#3f3f46', marginBottom:10 } as React.CSSProperties,
-  statVal: { fontFamily:"'Barlow Condensed',sans-serif", fontSize:36, fontWeight:900, color:'white', lineHeight:1, letterSpacing:-2 } as React.CSSProperties,
-  statBar: { position:'absolute', top:0, left:0, right:0, height:2 } as React.CSSProperties,
-  grid2: { display:'grid', gridTemplateColumns:'300px 1fr', gap:16, marginBottom:24 } as React.CSSProperties,
-  panel: { background:'#0d0d0d', border:'1px solid #161616', padding:24 } as React.CSSProperties,
-  panelHead: { display:'flex', alignItems:'center', gap:12, marginBottom:20 } as React.CSSProperties,
-  panelLine: { width:28, height:2, background:'#dc2626' } as React.CSSProperties,
-  panelTitle: { fontFamily:"'Barlow Condensed',sans-serif", fontSize:11, fontWeight:700, letterSpacing:4, textTransform:'uppercase', color:'#52525b' } as React.CSSProperties,
-  tableWrap: { background:'#0d0d0d', border:'1px solid #161616', overflow:'hidden' } as React.CSSProperties,
-  th: { padding:'12px 18px', textAlign:'left' as const, fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, color:'#3f3f46', textTransform:'uppercase' as const, letterSpacing:3 },
-  td: { padding:'13px 18px', fontSize:13, color:'#a1a1aa', borderBottom:'1px solid #111' },
-  btn: { display:'inline-flex', alignItems:'center', gap:8, background:'#dc2626', color:'white', border:'none', padding:'11px 22px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, fontWeight:700, letterSpacing:3, textTransform:'uppercase' as const, cursor:'pointer', clipPath:'polygon(0 0,92% 0,100% 25%,100% 100%,8% 100%,0 75%)' },
-  btnSm: { display:'inline-flex', alignItems:'center', gap:4, padding:'5px 12px', background:'rgba(220,38,38,0.1)', color:'#f87171', border:'1px solid rgba(220,38,38,0.2)', fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, letterSpacing:2, textTransform:'uppercase' as const, cursor:'pointer' },
-  btnGhost: { display:'inline-flex', alignItems:'center', gap:8, background:'transparent', color:'#52525b', border:'1px solid #1e1e1e', padding:'10px 20px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:12, fontWeight:700, letterSpacing:3, textTransform:'uppercase' as const, cursor:'pointer' },
-  input: { width:'100%', background:'#141414', border:'1px solid #1e1e1e', borderBottom:'2px solid #222', color:'white', padding:'12px 14px', fontFamily:"'Barlow',sans-serif", fontSize:14, outline:'none', boxSizing:'border-box' as const },
-  label: { display:'block', fontSize:9, letterSpacing:4, textTransform:'uppercase' as const, color:'#3f3f46', fontWeight:600, marginBottom:8 },
-  modal: { background:'#0d0d0d', border:'1px solid #1e1e1e', borderTop:'3px solid #dc2626', width:'100%', maxWidth:480, padding:32 } as React.CSSProperties,
-  overlay: { position:'fixed' as const, inset:0, background:'rgba(0,0,0,0.85)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:24 },
+  card:    { background:'#0d0d0d', border:'1px solid #1a1a1a', borderRadius:8, padding:20 } as React.CSSProperties,
+  label:   { display:'block', fontSize:9, letterSpacing:4, textTransform:'uppercase' as const, color:'#71717a', fontWeight:700, marginBottom:8 },
+  input:   { width:'100%', background:'#141414', border:'1px solid #1e1e1e', color:'white', padding:'10px 12px', fontSize:13, outline:'none', boxSizing:'border-box' as const, borderRadius:4 },
+  select:  { width:'100%', background:'#141414', border:'1px solid #1e1e1e', color:'white', padding:'10px 12px', fontSize:13, outline:'none', boxSizing:'border-box' as const, borderRadius:4 },
+  btn:     { display:'inline-flex', alignItems:'center', gap:8, background:'#dc2626', color:'white', border:'none', padding:'10px 20px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:12, fontWeight:700, letterSpacing:3, textTransform:'uppercase' as const, cursor:'pointer', borderRadius:6 },
+  btnGhost:{ display:'inline-flex', alignItems:'center', gap:8, background:'transparent', color:'#a1a1aa', border:'1px solid #1e1e1e', padding:'9px 18px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:11, fontWeight:700, letterSpacing:3, textTransform:'uppercase' as const, cursor:'pointer', borderRadius:6 },
+  overlay: { position:'fixed' as const, inset:0, background:'rgba(0,0,0,0.88)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:24 },
+  modal:   { background:'#0d0d0d', border:'1px solid #1e1e1e', borderTop:'3px solid #dc2626', width:'100%', maxWidth:560, maxHeight:'90vh', overflowY:'auto' as const, padding:28, borderRadius:8 },
 };
+
+const STATUS_COLOR: Record<string,string> = { PENDING:'#facc15', APPROVED:'#60a5fa', PAID:'#4ade80' };
+
+function PageHeader({ sub, title }: { sub: string; title: string }) {
+  return (
+    <div style={{ marginBottom:28, paddingBottom:20, borderBottom:'1px solid #161616', position:'relative' }}>
+      <div style={{ position:'absolute', bottom:-1, left:0, width:64, height:3, background:'#dc2626', borderRadius:2 }}/>
+      <div style={{ fontSize:10, letterSpacing:4, textTransform:'uppercase', color:'#71717a', marginBottom:4, fontWeight:600 }}>{sub}</div>
+      <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:40, fontWeight:900, color:'white', textTransform:'uppercase', letterSpacing:-1 }}>{title}</div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const color = STATUS_COLOR[status] || '#71717a';
+  return (
+    <span style={{ fontSize:10, color, background:`${color}15`, padding:'3px 10px', borderRadius:10, fontWeight:700, letterSpacing:1, textTransform:'uppercase' }}>
+      {status}
+    </span>
+  );
+}
 
 export default function PayrollPage() {
   const { user } = useAuth();
-  const [payrolls, setPayrolls] = useState<any[]>([]);
-  const [periods, setPeriods] = useState<any[]>([]);
-  const [selPeriod, setSelPeriod] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [showPeriodForm, setShowPeriodForm] = useState(false);
-  const [msg, setMsg] = useState('');
-  const [isErr, setIsErr] = useState(false);
-  const [periodForm, setPeriodForm] = useState({ name:'', start_date:'', end_date:'' });
+  const role = user?.role;
 
-  const fetchData = async () => {
-    setLoading(true);
+  if (role === 'HR')         return <HRPayrollView />;
+  if (role === 'SUPERVISOR') return <SupervisorPayrollView />;
+  if (role === 'CONTRACTOR') return <ContractorPayrollView />;
+  return <div style={{ color:'#52525b', padding:40 }}>Payroll not available for your role.</div>;
+}
+
+// ── HR PAYROLL — full control ───────────────────────────────────
+function HRPayrollView() {
+  const [tab, setTab]     = useState<'supervisor'|'contractor'|'labourer'>('supervisor');
+  const [projects, setProjects] = useState<any[]>([]);
+  const [periods, setPeriods]   = useState<any[]>([]);
+  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedPeriod,  setSelectedPeriod]  = useState('');
+  const [dashboard, setDashboard] = useState<any>({});
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [showNewPeriod,  setShowNewPeriod]  = useState(false);
+  const [supervisors, setSupervisors] = useState<any[]>([]);
+
+  const [projectForm, setProjectForm] = useState({ name:'', supervisor:'', location:'', start_date:'', end_date:'', description:'' });
+  const [periodForm,  setPeriodForm]  = useState({ project:'', name:'', start_date:'', end_date:'' });
+
+  useEffect(() => {
+    apiClient.get('/payroll/dashboard/').then(r => setDashboard(r.data));
+    apiClient.get('/attendance/projects/').then(r => setProjects(extractResults<any>(r.data)));
+    apiClient.get('/auth/users/?role=SUPERVISOR').then(r => setSupervisors(extractResults<any>(r.data)));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedProject) return;
+    apiClient.get(`/attendance/periods/?project=${selectedProject}`).then(r => setPeriods(extractResults<any>(r.data)));
+  }, [selectedProject]);
+
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
-      const params = selPeriod ? { period: selPeriod } : {};
-      const payRes = await getPayrolls(params);
-      setPayrolls(extractResults<any>(payRes.data));
-      if (user?.role==='HR') {
-        const perRes = await getPeriods();
-        setPeriods(extractResults<any>(perRes.data));
-      }
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+      await apiClient.post('/attendance/projects/', { ...projectForm, supervisor: projectForm.supervisor || null });
+      setShowNewProject(false);
+      setProjectForm({ name:'', supervisor:'', location:'', start_date:'', end_date:'', description:'' });
+      apiClient.get('/attendance/projects/').then(r => setProjects(extractResults<any>(r.data)));
+    } catch (err: any) { alert(JSON.stringify(err.response?.data)); }
   };
-
-  useEffect(() => { fetchData(); }, [selPeriod]);
 
   const handleCreatePeriod = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await createPeriod(periodForm);
-      setMsg('Period created.'); setIsErr(false);
-      setShowPeriodForm(false); setPeriodForm({ name:'', start_date:'', end_date:'' });
-      fetchData();
-    } catch (err: any) {
-      const d = err.response?.data;
-      setMsg(d ? Object.entries(d).map(([k,v])=>`${k}: ${Array.isArray(v)?v[0]:v}`).join(' | '):'Failed.');
-      setIsErr(true);
-    }
+      await apiClient.post('/attendance/periods/', periodForm);
+      setShowNewPeriod(false);
+      setPeriodForm({ project:'', name:'', start_date:'', end_date:'' });
+      if (selectedProject) apiClient.get(`/attendance/periods/?project=${selectedProject}`).then(r => setPeriods(extractResults<any>(r.data)));
+    } catch (err: any) { alert(JSON.stringify(err.response?.data)); }
   };
-
-  const handleGenerate = async (periodId: number) => {
-    try {
-      await generatePayroll(periodId);
-      setMsg('Payroll generated successfully.'); setIsErr(false);
-      fetchData();
-    } catch (err: any) {
-      setMsg(err.response?.data?.error||'Failed to generate.'); setIsErr(true);
-    }
-  };
-
-  const handleApprove = async (id: number) => {
-    try {
-      await approvePayroll(id, { payment_status:'APPROVED' });
-      fetchData();
-    } catch (e) { console.error(e); }
-  };
-
-  // Stats
-  const total    = payrolls.length;
-  const pending  = payrolls.filter(p=>p.payment_status==='PENDING').length;
-  const approved = payrolls.filter(p=>p.payment_status==='APPROVED').length;
-  const paid     = payrolls.filter(p=>p.payment_status==='PAID').length;
-  const totalWages = payrolls.reduce((s,p)=>s+parseFloat(p.total_salary||0),0);
-  const totalDays  = payrolls.reduce((s,p)=>s+parseInt(p.days_present||0),0);
-
-  // Wage distribution bars
-  const wageGroups = [
-    { label:'0–300', count: payrolls.filter(p=>parseFloat(p.total_salary||0)<300).length },
-    { label:'300–600', count: payrolls.filter(p=>{ const v=parseFloat(p.total_salary||0); return v>=300&&v<600; }).length },
-    { label:'600–1000', count: payrolls.filter(p=>{ const v=parseFloat(p.total_salary||0); return v>=600&&v<1000; }).length },
-    { label:'1000+', count: payrolls.filter(p=>parseFloat(p.total_salary||0)>=1000).length },
-  ];
-  const maxWg = Math.max(...wageGroups.map(g=>g.count), 1);
-
-  // Status donut
-  const r=50, cx=65, cy=65, stroke=16, circ=2*Math.PI*r;
-  const donut = [
-    { label:'Pending',  val:total?pending/total:0,  color:'#facc15' },
-    { label:'Approved', val:total?approved/total:0, color:'#4ade80' },
-    { label:'Paid',     val:total?paid/total:0,     color:'#60a5fa' },
-  ];
-  let dOffset=0;
-  const segs = donut.map(d => {
-    const dash=(d.val)*circ;
-    const seg={ ...d, dash, offset:dOffset, gap:circ-dash };
-    dOffset+=dash; return seg;
-  });
 
   return (
-    <>
-      <style>{`
-        @keyframes pageIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-        .pay-stat:hover{background:#111!important;transform:translateY(-2px);}
-        .pay-row:hover td{background:#111;}
-        .pay-input:focus{border-bottom-color:#dc2626!important;background:#181818!important;}
-        select option{background:#141414;color:white;}
-        .period-item{padding:12px 16px;border-bottom:1px solid #111;cursor:pointer;transition:background 0.15s;}
-        .period-item:hover{background:#111;}
-        .period-item.active{background:rgba(220,38,38,0.06);border-left:2px solid #dc2626;}
-      `}</style>
+    <div style={{ animation:'pageIn 0.4s ease' }}>
+      <style>{`@keyframes pageIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
+      <PageHeader sub="HR Administration" title="Payroll Management"/>
 
-      <div style={S.page}>
-        {/* Header */}
-        <div style={S.hdr}>
-          <div style={S.hdrLine}/>
-          <div>
-            <div style={S.sub}>Finance</div>
-            <div style={S.title}>Payroll</div>
+      {/* Dashboard stats */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16, marginBottom:28 }}>
+        {[
+          { label:'Supervisor Payroll', data: dashboard.supervisor_payrolls, color:'#a78bfa' },
+          { label:'Contractor Payroll', data: dashboard.contractor_payrolls, color:'#facc15' },
+          { label:'Labourer Payroll',   data: dashboard.labourer_payrolls,   color:'#4ade80' },
+        ].map(({ label, data, color }) => data && (
+          <div key={label} style={{ ...S.card, borderTop:`2px solid ${color}` }}>
+            <div style={{ fontSize:9, letterSpacing:4, textTransform:'uppercase', color:'#71717a', fontWeight:700, marginBottom:12 }}>{label}</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:12 }}>
+              {['pending','approved','paid'].map(k => (
+                <div key={k} style={{ textAlign:'center' }}>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:24, fontWeight:900, color: STATUS_COLOR[k.toUpperCase()] }}>{data[k]}</div>
+                  <div style={{ fontSize:9, color:'#52525b', letterSpacing:2, textTransform:'uppercase', fontWeight:700 }}>{k}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ borderTop:'1px solid #1a1a1a', paddingTop:10 }}>
+              <span style={{ fontSize:11, color:'#71717a' }}>Total Payable: </span>
+              <span style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:18, fontWeight:800, color }}>
+                ₹{Number(data.total_amount||0).toLocaleString('en-IN', { minimumFractionDigits:2 })}
+              </span>
+            </div>
           </div>
-          {user?.role==='HR' && (
-            <button style={S.btn} onClick={()=>setShowPeriodForm(true)}>
-              <Plus size={14}/> New Period
-            </button>
-          )}
-        </div>
+        ))}
+      </div>
 
-        {msg && (
-          <div style={{ background: isErr?'rgba(220,38,38,0.07)':'rgba(22,163,74,0.07)', borderLeft:`3px solid ${isErr?'#dc2626':'#16a34a'}`, padding:'12px 16px', marginBottom:20, fontSize:13, color: isErr?'#fca5a5':'#4ade80' }}>
-            {msg}
+      {/* Projects & Periods */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:28 }}>
+        <div style={S.card}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:14, fontWeight:800, color:'white', textTransform:'uppercase', letterSpacing:2 }}>Projects</div>
+            <button style={{ ...S.btn, padding:'6px 12px', fontSize:10 }} onClick={() => setShowNewProject(true)}><Plus size={12}/> New</button>
           </div>
-        )}
-
-        {/* Stats */}
-        <div style={S.statsRow}>
-          {[
-            { label:'Total Records', val: total,                         color:'#dc2626' },
-            { label:'Pending',       val: pending,                        color:'#facc15' },
-            { label:'Approved',      val: approved,                       color:'#4ade80' },
-            { label:'Total Wages',   val:`₹${Math.round(totalWages).toLocaleString('en-IN')}`, color:'#60a5fa' },
-          ].map(s => (
-            <div key={s.label} className="pay-stat" style={S.statBox}>
-              <div style={{...S.statBar, background:s.color}}/>
-              <div style={S.statLabel}>{s.label}</div>
-              <div style={{...S.statVal, color:s.color, fontSize:typeof s.val==='string'?24:44}}>{s.val}</div>
+          <select style={S.select} value={selectedProject} onChange={e => setSelectedProject(e.target.value)}>
+            <option value="">All Projects</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name} — {p.status}</option>)}
+          </select>
+          {projects.filter(p => !selectedProject || String(p.id) === selectedProject).map(p => (
+            <div key={p.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid #111' }}>
+              <div>
+                <div style={{ fontWeight:600, color:'white', fontSize:13 }}>{p.name}</div>
+                <div style={{ fontSize:11, color:'#71717a' }}>{p.supervisor_name || '—'} · {p.start_date}</div>
+              </div>
+              <span style={{ fontSize:10, color: p.status==='ACTIVE'?'#4ade80':'#52525b', background: p.status==='ACTIVE'?'rgba(22,163,74,0.1)':'#111', padding:'2px 8px', borderRadius:8, fontWeight:700 }}>{p.status}</span>
             </div>
           ))}
         </div>
 
-        {/* Main grid: periods sidebar + charts */}
-        <div style={S.grid2}>
-          {/* Periods list */}
-          {user?.role==='HR' && (
-            <div style={S.panel}>
-              <div style={S.panelHead}>
-                <div style={S.panelLine}/>
-                <div style={S.panelTitle}>Periods</div>
-              </div>
-              <div style={{ marginBottom:12 }}>
-                <button
-                  className={`period-item${selPeriod===''?' active':''}`}
-                  style={{ display:'block', width:'100%', textAlign:'left', background:'transparent', border:'none', borderBottom:'1px solid #111', padding:'12px 16px', cursor:'pointer', fontFamily:"'Barlow Condensed',sans-serif", fontSize:12, letterSpacing:2, textTransform:'uppercase', color: selPeriod===''?'white':'#52525b', borderLeft: selPeriod===''?'2px solid #dc2626':'2px solid transparent', transition:'all 0.15s' }}
-                  onClick={()=>setSelPeriod('')}
-                >All Periods</button>
-                {periods.map(p => (
-                  <div key={p.id}
-                    className={`period-item${selPeriod===String(p.id)?' active':''}`}
-                    style={{ borderLeft: selPeriod===String(p.id)?'2px solid #dc2626':'2px solid transparent', background:'transparent' }}
-                    onClick={()=>setSelPeriod(String(p.id))}
-                  >
-                    <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:13, fontWeight:700, color: selPeriod===String(p.id)?'white':'#71717a', letterSpacing:1, textTransform:'uppercase', marginBottom:3 }}>{p.name}</div>
-                    <div style={{ fontSize:10, color:'#3f3f46', letterSpacing:1 }}>{p.start_date} → {p.end_date}</div>
-                    <div style={{ display:'flex', gap:8, marginTop:8 }}>
-                      <button style={{...S.btnSm, background:'rgba(37,99,235,0.1)', color:'#60a5fa', border:'1px solid rgba(37,99,235,0.2)'}}
-                        onClick={e=>{e.stopPropagation();handleGenerate(p.id);}}>
-                        <Zap size={10}/> Generate
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {periods.length===0 && <div style={{ color:'#27272a', fontSize:11, letterSpacing:2, textTransform:'uppercase', fontFamily:"'Barlow Condensed',sans-serif", padding:'12px 16px' }}>No periods yet</div>}
-              </div>
-            </div>
-          )}
-
-          {/* Charts */}
-          <div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 }}>
-              {/* Status donut */}
-              <div style={S.panel}>
-                <div style={S.panelHead}>
-                  <div style={S.panelLine}/>
-                  <div style={S.panelTitle}>Payment Status</div>
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap:20 }}>
-                  <svg width={130} height={130} viewBox="0 0 130 130">
-                    <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1a1a1a" strokeWidth={stroke}/>
-                    {total===0 ? <circle cx={cx} cy={cy} r={r} fill="none" stroke="#222" strokeWidth={stroke}/> :
-                      segs.map((s,i)=>(
-                        <circle key={i} cx={cx} cy={cy} r={r} fill="none"
-                          stroke={s.color} strokeWidth={stroke}
-                          strokeDasharray={`${s.dash} ${s.gap}`}
-                          strokeDashoffset={-s.offset}
-                          transform={`rotate(-90 ${cx} ${cy})`}/>
-                      ))
-                    }
-                    <text x={cx} y={cy-4} textAnchor="middle" fill="white"
-                      style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:20, fontWeight:900 }}>{total}</text>
-                    <text x={cx} y={cy+12} textAnchor="middle" fill="#3f3f46"
-                      style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:8, letterSpacing:2 }}>TOTAL</text>
-                  </svg>
-                  <div style={{ flex:1 }}>
-                    {donut.map(d=>(
-                      <div key={d.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid #111' }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                          <div style={{ width:7, height:7, background:d.color }}/>
-                          <span style={{ fontSize:10, color:'#52525b', textTransform:'uppercase', letterSpacing:2, fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700 }}>{d.label}</span>
-                        </div>
-                        <span style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:16, fontWeight:900, color:d.color }}>
-                          {Math.round(d.val*100)}<span style={{fontSize:9,color:'#3f3f46'}}>%</span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Wage distribution */}
-              <div style={S.panel}>
-                <div style={S.panelHead}>
-                  <div style={S.panelLine}/>
-                  <div style={S.panelTitle}>Wage Distribution</div>
-                </div>
-                {wageGroups.map(g=>(
-                  <div key={g.label} style={{ marginBottom:10 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                      <span style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, letterSpacing:2, textTransform:'uppercase', color:'#52525b' }}>₹{g.label}</span>
-                      <span style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:14, fontWeight:900, color:'white' }}>{g.count}</span>
-                    </div>
-                    <div style={{ height:4, background:'#1a1a1a', overflow:'hidden' }}>
-                      <div style={{ height:'100%', background:'#dc2626', width:`${(g.count/maxWg)*100}%`, transition:'width 0.5s' }}/>
-                    </div>
-                  </div>
-                ))}
-                <div style={{ marginTop:16, paddingTop:12, borderTop:'1px solid #111', fontFamily:"'Barlow Condensed',sans-serif", fontSize:11, color:'#52525b', letterSpacing:2, textTransform:'uppercase' }}>
-                  Total days worked: <span style={{ color:'white', fontWeight:900 }}>{totalDays}</span>
-                </div>
-              </div>
-            </div>
+        <div style={S.card}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:14, fontWeight:800, color:'white', textTransform:'uppercase', letterSpacing:2 }}>Periods</div>
+            <button style={{ ...S.btn, padding:'6px 12px', fontSize:10 }} onClick={() => setShowNewPeriod(true)}><Plus size={12}/> New</button>
           </div>
-        </div>
-
-        {/* Payroll table */}
-        <div style={S.panelHead}>
-          <div style={S.panelLine}/>
-          <div style={S.panelTitle}>Payroll Records</div>
-        </div>
-        <div style={S.tableWrap}>
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
-            <thead>
-              <tr style={{ background:'#0a0a0a', borderBottom:'1px solid #1a1a1a' }}>
-                {['Labourer','Period','Days','OT hrs','Wage/Day','Total','Status','Action'].map(h=>(
-                  <th key={h} style={S.th}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={8} style={{ padding:40, textAlign:'center', color:'#3f3f46', fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:4, textTransform:'uppercase', fontSize:12 }}>Loading...</td></tr>
-              ) : payrolls.length===0 ? (
-                <tr><td colSpan={8} style={{ padding:60, textAlign:'center', color:'#27272a', fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:4, textTransform:'uppercase', fontSize:14 }}>No Payroll Records</td></tr>
-              ) : payrolls.map(p => {
-                const sc = PAY_STATUS[p.payment_status]||{ bg:'rgba(82,82,91,0.2)', color:'#a1a1aa' };
-                return (
-                  <tr key={p.id} className="pay-row">
-                    <td style={{...S.td, color:'white', fontWeight:600}}>{p.labourer_detail?.user_detail?.first_name||p.labourer}</td>
-                    <td style={S.td}>{p.period_detail?.name||p.period}</td>
-                    <td style={{...S.td, color:'#60a5fa', fontFamily:"'Barlow Condensed',sans-serif", fontSize:16, fontWeight:900}}>{p.days_present}</td>
-                    <td style={{...S.td, color:p.overtime_hours>0?'#facc15':'#3f3f46'}}>{p.overtime_hours}h</td>
-                    <td style={S.td}>₹{p.daily_wage_snapshot}</td>
-                    <td style={{...S.td, color:'#4ade80', fontFamily:"'Barlow Condensed',sans-serif", fontSize:15, fontWeight:900}}>₹{parseFloat(p.total_salary||0).toLocaleString('en-IN')}</td>
-                    <td style={S.td}>
-                      <span style={{ background:sc.bg, color:sc.color, padding:'3px 10px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, letterSpacing:2, textTransform:'uppercase' }}>
-                        {p.payment_status}
-                      </span>
-                    </td>
-                    <td style={S.td}>
-                      {p.payment_status==='PENDING' && user?.role==='HR' && (
-                        <button onClick={()=>handleApprove(p.id)} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 12px', background:'rgba(22,163,74,0.1)', color:'#4ade80', border:'1px solid rgba(22,163,74,0.2)', fontFamily:"'Barlow Condensed',sans-serif", fontSize:10, fontWeight:700, letterSpacing:2, textTransform:'uppercase', cursor:'pointer' }}>
-                          <Check size={11}/> Approve
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Create Period Modal */}
-        {showPeriodForm && (
-          <div style={S.overlay}>
-            <div style={S.modal}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24, paddingBottom:20, borderBottom:'1px solid #1a1a1a' }}>
-                <div>
-                  <div style={{ fontSize:9, letterSpacing:5, textTransform:'uppercase', color:'#dc2626', fontWeight:600, marginBottom:4 }}>Finance</div>
-                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:28, fontWeight:900, color:'white', textTransform:'uppercase', letterSpacing:-1 }}>New Pay Period</div>
-                </div>
-                <button onClick={()=>setShowPeriodForm(false)} style={{ background:'#1a1a1a', border:'1px solid #222', color:'#52525b', width:32, height:32, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-                  <X size={16}/>
-                </button>
+          {periods.length === 0 ? (
+            <div style={{ color:'#3f3f46', fontSize:12, padding:'20px 0' }}>Select a project to see its periods.</div>
+          ) : periods.map(p => (
+            <div key={p.id} style={{ padding:'10px 0', borderBottom:'1px solid #111' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <div style={{ fontWeight:600, color:'white', fontSize:13 }}>{p.name}</div>
+                <StatusBadge status={p.status}/>
               </div>
-              <form onSubmit={handleCreatePeriod}>
-                <div style={{ marginBottom:18 }}>
-                  <label style={S.label}>Period Name</label>
-                  <input className="pay-input" style={S.input} placeholder="e.g. February 2025" value={periodForm.name} onChange={e=>setPeriodForm({...periodForm,name:e.target.value})} required/>
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:24 }}>
-                  <div>
-                    <label style={S.label}>Start Date</label>
-                    <input className="pay-input" style={S.input} type="date" value={periodForm.start_date} onChange={e=>setPeriodForm({...periodForm,start_date:e.target.value})} required/>
-                  </div>
-                  <div>
-                    <label style={S.label}>End Date</label>
-                    <input className="pay-input" style={S.input} type="date" value={periodForm.end_date} onChange={e=>setPeriodForm({...periodForm,end_date:e.target.value})} required/>
-                  </div>
-                </div>
-                <div style={{ display:'flex', gap:12 }}>
-                  <button type="submit" style={S.btn}>Create Period</button>
-                  <button type="button" style={S.btnGhost} onClick={()=>setShowPeriodForm(false)}>Cancel</button>
-                </div>
-              </form>
+              <div style={{ fontSize:11, color:'#71717a', marginTop:2 }}>{p.start_date} → {p.end_date}</div>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
       </div>
-    </>
+
+      {/* Tab bar */}
+      <div style={{ display:'flex', gap:2, marginBottom:20, background:'#0a0a0a', border:'1px solid #1a1a1a', borderRadius:8, padding:4 }}>
+        {([['supervisor','Supervisor Payroll'],['contractor','Contractor Payroll'],['labourer','Labourer Payroll']] as [string,string][]).map(([key,label]) => (
+          <button key={key} onClick={() => setTab(key as any)} style={{ flex:1, padding:'9px 0', background: tab===key ? '#dc2626' : 'transparent', color: tab===key ? 'white' : '#52525b', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:12, fontWeight:700, letterSpacing:2, textTransform:'uppercase', cursor:'pointer', transition:'all 0.2s' }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'supervisor'  && <PayrollTable type="supervisor"  projectId={selectedProject} periodId={selectedPeriod}/>}
+      {tab === 'contractor'  && <PayrollTable type="contractor"  projectId={selectedProject} periodId={selectedPeriod}/>}
+      {tab === 'labourer'    && <PayrollTable type="labourer"    projectId={selectedProject} periodId={selectedPeriod}/>}
+
+      {/* New Project Modal */}
+      {showNewProject && (
+        <div style={S.overlay}>
+          <div style={S.modal}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, paddingBottom:16, borderBottom:'1px solid #1a1a1a' }}>
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:22, fontWeight:900, color:'white', textTransform:'uppercase' }}>New Project</div>
+              <button onClick={() => setShowNewProject(false)} style={{ background:'#1a1a1a', border:'1px solid #222', color:'#a1a1aa', width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', borderRadius:5 }}><X size={13}/></button>
+            </div>
+            <form onSubmit={handleCreateProject}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+                <div style={{ gridColumn:'1/-1' }}>
+                  <label style={S.label}>Project Name *</label>
+                  <input style={S.input} required value={projectForm.name} onChange={e => setProjectForm({...projectForm, name:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>Supervisor</label>
+                  <select style={S.select} value={projectForm.supervisor} onChange={e => setProjectForm({...projectForm, supervisor:e.target.value})}>
+                    <option value="">— Select Supervisor —</option>
+                    {supervisors.map(s => <option key={s.id} value={s.id}>{s.first_name} {s.last_name||s.username}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={S.label}>Location</label>
+                  <input style={S.input} value={projectForm.location} onChange={e => setProjectForm({...projectForm, location:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>Start Date *</label>
+                  <input type="date" style={S.input} required value={projectForm.start_date} onChange={e => setProjectForm({...projectForm, start_date:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>End Date</label>
+                  <input type="date" style={S.input} value={projectForm.end_date} onChange={e => setProjectForm({...projectForm, end_date:e.target.value})}/>
+                </div>
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <button type="submit" style={S.btn}>Create Project</button>
+                <button type="button" style={S.btnGhost} onClick={() => setShowNewProject(false)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* New Period Modal */}
+      {showNewPeriod && (
+        <div style={S.overlay}>
+          <div style={S.modal}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, paddingBottom:16, borderBottom:'1px solid #1a1a1a' }}>
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:22, fontWeight:900, color:'white', textTransform:'uppercase' }}>New Period</div>
+              <button onClick={() => setShowNewPeriod(false)} style={{ background:'#1a1a1a', border:'1px solid #222', color:'#a1a1aa', width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', borderRadius:5 }}><X size={13}/></button>
+            </div>
+            <form onSubmit={handleCreatePeriod}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+                <div style={{ gridColumn:'1/-1' }}>
+                  <label style={S.label}>Project *</label>
+                  <select style={S.select} required value={periodForm.project} onChange={e => setPeriodForm({...periodForm, project:e.target.value})}>
+                    <option value="">— Select Project —</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div style={{ gridColumn:'1/-1' }}>
+                  <label style={S.label}>Period Name * (e.g. "Week 1" or "Phase A")</label>
+                  <input style={S.input} required value={periodForm.name} onChange={e => setPeriodForm({...periodForm, name:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>Start Date *</label>
+                  <input type="date" style={S.input} required value={periodForm.start_date} onChange={e => setPeriodForm({...periodForm, start_date:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>End Date *</label>
+                  <input type="date" style={S.input} required value={periodForm.end_date} onChange={e => setPeriodForm({...periodForm, end_date:e.target.value})}/>
+                </div>
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <button type="submit" style={S.btn}>Create Period</button>
+                <button type="button" style={S.btnGhost} onClick={() => setShowNewPeriod(false)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── SUPERVISOR PAYROLL VIEW ─────────────────────────────────────
+function SupervisorPayrollView() {
+  return (
+    <div style={{ animation:'pageIn 0.4s ease' }}>
+      <PageHeader sub="Supervisor Portal" title="My Payroll"/>
+      <PayrollTable type="supervisor" projectId="" periodId=""/>
+    </div>
+  );
+}
+
+// ── CONTRACTOR PAYROLL VIEW ─────────────────────────────────────
+function ContractorPayrollView() {
+  const [projects, setProjects] = useState<any[]>([]);
+  const [selectedProject, setSelectedProject] = useState('');
+
+  useEffect(() => {
+    apiClient.get('/attendance/projects/').then(r => setProjects(extractResults<any>(r.data)));
+  }, []);
+
+  return (
+    <div style={{ animation:'pageIn 0.4s ease' }}>
+      <PageHeader sub="Contractor Portal" title="My Payroll"/>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:24 }}>
+        <div>
+          <label style={S.label}>Filter by Project</label>
+          <select style={S.select} value={selectedProject} onChange={e => setSelectedProject(e.target.value)}>
+            <option value="">All Projects</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+      </div>
+      <PayrollTable type="contractor" projectId={selectedProject} periodId=""/>
+      <div style={{ marginTop:28 }}>
+        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:16, fontWeight:800, color:'white', textTransform:'uppercase', letterSpacing:2, marginBottom:16 }}>My Labourers' Payroll</div>
+        <PayrollTable type="labourer" projectId={selectedProject} periodId=""/>
+      </div>
+    </div>
+  );
+}
+
+// ── SHARED PAYROLL TABLE ────────────────────────────────────────
+function PayrollTable({ type, projectId, periodId }: { type:'supervisor'|'contractor'|'labourer'; projectId:string; periodId:string }) {
+  const [records, setRecords] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      let url = `/payroll/${type}/?`;
+      if (projectId) url += `project=${projectId}&`;
+      if (periodId)  url += `period=${periodId}&`;
+      const res = await apiClient.get(url);
+      setRecords(extractResults<any>(res.data));
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }, [type, projectId, periodId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const updateStatus = async (id: number, status: string) => {
+    try {
+      await apiClient.patch(`/payroll/${type}/${id}/`, { status });
+      load();
+    } catch (e) { alert('Failed to update status.'); }
+  };
+
+  const autoCalc = async (id: number) => {
+    try {
+      await apiClient.post(`/payroll/labourer/${id}/calculate/`);
+      load();
+    } catch (e) { alert('Calculation failed.'); }
+  };
+
+  const totalAmount = records.reduce((sum, r) => sum + parseFloat(r.total_amount || 0), 0);
+
+  return (
+    <div>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:20, height:2, background:'#dc2626' }}/>
+          <span style={{ fontSize:11, color:'#71717a', fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:3, textTransform:'uppercase', fontWeight:700 }}>
+            {records.length} records · Total: ₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits:2 })}
+          </span>
+        </div>
+        <div style={{ display:'flex', gap:8 }}>
+          <button style={S.btnGhost} onClick={load}><RefreshCw size={12}/> Refresh</button>
+          <button style={S.btn} onClick={() => setShowForm(true)}><Plus size={12}/> Add</button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ ...S.card, color:'#52525b', textAlign:'center', padding:40 }}>Loading...</div>
+      ) : records.length === 0 ? (
+        <div style={{ ...S.card, color:'#3f3f46', textAlign:'center', padding:40 }}>No payroll records found.</div>
+      ) : (
+        <div style={{ ...S.card, padding:0, overflow:'hidden' }}>
+          <div style={{ display:'grid', gridTemplateColumns: type==='labourer' ? '1.5fr 1fr 1fr 1fr 1fr 120px 80px' : '1.5fr 1fr 1fr 1fr 120px 80px', padding:'10px 16px', background:'#0a0a0a', borderBottom:'1px solid #1a1a1a', gap:8 }}>
+            {['Name','Project','Period/Month','Amount','Status','Actions', type==='labourer'?'Calc':''].filter(Boolean).map(h => (
+              <span key={h} style={{ fontSize:9, letterSpacing:3, textTransform:'uppercase', color:'#3f3f46', fontWeight:700 }}>{h}</span>
+            ))}
+          </div>
+          {records.map((r, i) => (
+            <div key={r.id} style={{ display:'grid', gridTemplateColumns: type==='labourer' ? '1.5fr 1fr 1fr 1fr 1fr 120px 80px' : '1.5fr 1fr 1fr 1fr 120px 80px', padding:'13px 16px', background: i%2===0 ? '#0d0d0d':'#0a0a0a', borderBottom:'1px solid #111', alignItems:'center', gap:8 }}>
+              <div style={{ fontWeight:600, color:'white', fontSize:13 }}>
+                {r.supervisor_name || r.contractor_name || r.labourer_name}
+                {r.is_temp && <span style={{ fontSize:9, color:'#facc15', marginLeft:6, background:'rgba(202,138,4,0.1)', padding:'1px 5px', borderRadius:6 }}>TEMP</span>}
+              </div>
+              <div style={{ fontSize:12, color:'#a1a1aa' }}>{r.project_name}</div>
+              <div style={{ fontSize:12, color:'#a1a1aa' }}>{r.period_name || r.month || '—'}</div>
+              {type === 'labourer' && <div style={{ fontSize:12, color:'#a1a1aa' }}>{r.days_present}d</div>}
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:16, fontWeight:800, color:'#4ade80' }}>
+                ₹{Number(r.total_amount).toLocaleString('en-IN', { minimumFractionDigits:2 })}
+              </div>
+              <StatusBadge status={r.status}/>
+              <div style={{ display:'flex', gap:4 }}>
+                {r.status === 'PENDING' && (
+                  <button onClick={() => updateStatus(r.id, 'APPROVED')} style={{ padding:'4px 8px', background:'rgba(37,99,235,0.1)', border:'1px solid rgba(37,99,235,0.3)', color:'#60a5fa', borderRadius:4, fontSize:9, fontWeight:700, cursor:'pointer', letterSpacing:1 }}>
+                    APPROVE
+                  </button>
+                )}
+                {r.status === 'APPROVED' && (
+                  <button onClick={() => updateStatus(r.id, 'PAID')} style={{ padding:'4px 8px', background:'rgba(22,163,74,0.1)', border:'1px solid rgba(22,163,74,0.3)', color:'#4ade80', borderRadius:4, fontSize:9, fontWeight:700, cursor:'pointer', letterSpacing:1 }}>
+                    MARK PAID
+                  </button>
+                )}
+              </div>
+              {type === 'labourer' && (
+                <button onClick={() => autoCalc(r.id)} title="Auto-calculate from attendance" style={{ padding:'4px 8px', background:'#141414', border:'1px solid #1e1e1e', color:'#71717a', borderRadius:4, fontSize:9, cursor:'pointer', display:'flex', alignItems:'center', gap:3 }}>
+                  <RefreshCw size={10}/> Calc
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && (
+        <AddPayrollModal type={type} onClose={() => { setShowForm(false); load(); }}/>
+      )}
+    </div>
+  );
+}
+
+// ── ADD PAYROLL MODAL ───────────────────────────────────────────
+function AddPayrollModal({ type, onClose }: { type:string; onClose:()=>void }) {
+  const [form, setForm] = useState<any>({});
+  const [projects, setProjects]     = useState<any[]>([]);
+  const [periods,  setPeriods]      = useState<any[]>([]);
+  const [supervisors, setSupervisors] = useState<any[]>([]);
+  const [contractors, setContractors] = useState<any[]>([]);
+  const [labourers,   setLabourers]   = useState<any[]>([]);
+  const [tempLabs,    setTempLabs]    = useState<any[]>([]);
+
+  useEffect(() => {
+    apiClient.get('/attendance/projects/').then(r => setProjects(extractResults<any>(r.data)));
+    if (type === 'supervisor') apiClient.get('/auth/users/?role=SUPERVISOR').then(r => setSupervisors(extractResults<any>(r.data)));
+    if (type === 'contractor') apiClient.get('/workforce/contractors/').then(r => setContractors(extractResults<any>(r.data)));
+    if (type === 'labourer') {
+      apiClient.get('/workforce/labourers/').then(r => setLabourers(extractResults<any>(r.data)));
+      apiClient.get('/attendance/temp-labourers/').then(r => setTempLabs(extractResults<any>(r.data)));
+    }
+  }, [type]);
+
+  useEffect(() => {
+    if (form.project) apiClient.get(`/attendance/periods/?project=${form.project}`).then(r => setPeriods(extractResults<any>(r.data)));
+  }, [form.project]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload = { ...form };
+      await apiClient.post(`/payroll/${type}/`, payload);
+      onClose();
+    } catch (err: any) { alert(JSON.stringify(err.response?.data)); }
+  };
+
+  return (
+    <div style={S.overlay}>
+      <div style={S.modal}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, paddingBottom:16, borderBottom:'1px solid #1a1a1a' }}>
+          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:22, fontWeight:900, color:'white', textTransform:'uppercase' }}>
+            Add {type} Payroll
+          </div>
+          <button onClick={onClose} style={{ background:'#1a1a1a', border:'1px solid #222', color:'#a1a1aa', width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', borderRadius:5 }}><X size={13}/></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
+            {/* Person selector */}
+            {type === 'supervisor' && (
+              <div style={{ gridColumn:'1/-1' }}>
+                <label style={S.label}>Supervisor *</label>
+                <select style={S.select} required value={form.supervisor||''} onChange={e => setForm({...form, supervisor:e.target.value})}>
+                  <option value="">— Select —</option>
+                  {supervisors.map(s => <option key={s.id} value={s.id}>{s.first_name} {s.last_name||s.username}</option>)}
+                </select>
+              </div>
+            )}
+            {type === 'contractor' && (
+              <div style={{ gridColumn:'1/-1' }}>
+                <label style={S.label}>Contractor *</label>
+                <select style={S.select} required value={form.contractor||''} onChange={e => setForm({...form, contractor:e.target.value})}>
+                  <option value="">— Select —</option>
+                  {contractors.map(c => <option key={c.id} value={c.id}>{c.user_detail?.first_name} {c.user_detail?.last_name||c.user_detail?.username}</option>)}
+                </select>
+              </div>
+            )}
+            {type === 'labourer' && (
+              <>
+                <div>
+                  <label style={S.label}>Fixed Labourer</label>
+                  <select style={S.select} value={form.labourer||''} onChange={e => setForm({...form, labourer:e.target.value, temp_labourer:''})}>
+                    <option value="">— Select —</option>
+                    {labourers.map(l => <option key={l.id} value={l.id}>{l.user_detail?.first_name} {l.user_detail?.last_name||l.user_detail?.username}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={S.label}>Or Temp Labourer</label>
+                  <select style={S.select} value={form.temp_labourer||''} onChange={e => setForm({...form, temp_labourer:e.target.value, labourer:''})}>
+                    <option value="">— Select —</option>
+                    {tempLabs.map(t => <option key={t.id} value={t.id}>{t.name} (Temp)</option>)}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {/* Project */}
+            <div>
+              <label style={S.label}>Project *</label>
+              <select style={S.select} required value={form.project||''} onChange={e => setForm({...form, project:e.target.value})}>
+                <option value="">— Select —</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+
+            {/* Period (not for supervisor monthly) */}
+            {type !== 'supervisor' && (
+              <div>
+                <label style={S.label}>Period *</label>
+                <select style={S.select} required value={form.period||''} onChange={e => setForm({...form, period:e.target.value})}>
+                  <option value="">— Select —</option>
+                  {periods.map(p => <option key={p.id} value={p.id}>{p.name} ({p.start_date}→{p.end_date})</option>)}
+                </select>
+              </div>
+            )}
+
+            {/* Supervisor: monthly salary + month */}
+            {type === 'supervisor' && (
+              <>
+                <div>
+                  <label style={S.label}>Month *</label>
+                  <input type="date" style={S.input} required value={form.month||''} onChange={e => setForm({...form, month:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>Monthly Salary (₹) *</label>
+                  <input type="number" style={S.input} required min="0" value={form.monthly_salary||''} onChange={e => setForm({...form, monthly_salary:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>Bonus (₹)</label>
+                  <input type="number" style={S.input} min="0" value={form.bonus||'0'} onChange={e => setForm({...form, bonus:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>Deductions (₹)</label>
+                  <input type="number" style={S.input} min="0" value={form.deductions||'0'} onChange={e => setForm({...form, deductions:e.target.value})}/>
+                </div>
+              </>
+            )}
+
+            {/* Contractor: project amount */}
+            {type === 'contractor' && (
+              <>
+                <div>
+                  <label style={S.label}>Project Amount (₹) *</label>
+                  <input type="number" style={S.input} required min="0" value={form.project_amount||''} onChange={e => setForm({...form, project_amount:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>Advance Paid (₹)</label>
+                  <input type="number" style={S.input} min="0" value={form.advance_paid||'0'} onChange={e => setForm({...form, advance_paid:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>Deductions (₹)</label>
+                  <input type="number" style={S.input} min="0" value={form.deductions||'0'} onChange={e => setForm({...form, deductions:e.target.value})}/>
+                </div>
+              </>
+            )}
+
+            {/* Labourer: wage info (or auto-calc) */}
+            {type === 'labourer' && (
+              <>
+                <div>
+                  <label style={S.label}>Daily Wage (₹)</label>
+                  <input type="number" style={S.input} min="0" value={form.daily_wage||'0'} onChange={e => setForm({...form, daily_wage:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>OT Rate (₹/hr)</label>
+                  <input type="number" style={S.input} min="0" value={form.overtime_rate||'0'} onChange={e => setForm({...form, overtime_rate:e.target.value})}/>
+                </div>
+                <div>
+                  <label style={S.label}>Deductions (₹)</label>
+                  <input type="number" style={S.input} min="0" value={form.deductions||'0'} onChange={e => setForm({...form, deductions:e.target.value})}/>
+                </div>
+              </>
+            )}
+          </div>
+          <div style={{ display:'flex', gap:10 }}>
+            <button type="submit" style={S.btn}>Save Payroll</button>
+            <button type="button" style={S.btnGhost} onClick={onClose}>Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

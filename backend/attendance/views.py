@@ -1,163 +1,296 @@
-from django.shortcuts import render
+# attendance/views.py — REPLACE ENTIRE FILE
 
-# Create your views here.
+from datetime import date
+from django.db.models import Count, Q
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Sum, Count, Q
-from .models import Attendance
-from .serializers import AttendanceSerializer, AttendanceApprovalSerializer
-from users.permissions import IsHR, IsHROrSupervisor
-from workforce.models import Labourer
+
+from .models import Project, Period, TemporaryLabourer, ContractorAttendance, LabourerAttendance
+from .serializers import (
+    ProjectSerializer, PeriodSerializer, TemporaryLabourerSerializer,
+    ContractorAttendanceSerializer, LabourerAttendanceSerializer
+)
+from users.permissions import IsHR
+from workforce.models import Contractor, Labourer
 
 
-class AttendanceListCreateView(generics.ListCreateAPIView):
-    """
-    GET  /api/attendance/          — List attendance records
-    POST /api/attendance/          — Mark attendance (Supervisor)
-    """
-    serializer_class = AttendanceSerializer
+# ── PROJECTS ────────────────────────────────────────────────────
+class ProjectListCreateView(generics.ListCreateAPIView):
+    serializer_class   = ProjectSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        qs = Attendance.objects.select_related('labourer__user', 'marked_by', 'approved_by').all()
-
-        # Role-based filtering
+        if user.role == 'HR':
+            return Project.objects.all()
         if user.role == 'SUPERVISOR':
-            qs = qs.filter(labourer__contractor__supervisor=user)
+            return Project.objects.filter(supervisor=user)
+        if user.role == 'CONTRACTOR':
+            cp = Contractor.objects.filter(user=user).first()
+            if cp and cp.supervisor:
+                return Project.objects.filter(supervisor=cp.supervisor)
+        return Project.objects.none()
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+
+class ProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class   = ProjectSerializer
+    permission_classes = [IsAuthenticated]
+    queryset           = Project.objects.all()
+
+
+# ── PERIODS ─────────────────────────────────────────────────────
+class PeriodListCreateView(generics.ListCreateAPIView):
+    serializer_class   = PeriodSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        project_id = self.request.query_params.get('project')
+        qs = Period.objects.all()
+        if user.role == 'SUPERVISOR':
+            qs = qs.filter(project__supervisor=user)
         elif user.role == 'CONTRACTOR':
-            try:
-                qs = qs.filter(labourer__contractor=user.contractor_profile)
-            except Exception:
-                return Attendance.objects.none()
-        elif user.role == 'LABOURER':
-            try:
-                qs = qs.filter(labourer=user.labourer_profile)
-            except Exception:
-                return Attendance.objects.none()
+            cp = Contractor.objects.filter(user=user).first()
+            if cp and cp.supervisor:
+                qs = qs.filter(project__supervisor=cp.supervisor)
+        if project_id:
+            qs = qs.filter(project_id=project_id)
+        return qs
 
-        # Query param filters
-        labourer_id = self.request.query_params.get('labourer')
-        if labourer_id:
-            qs = qs.filter(labourer_id=labourer_id)
 
-        date_from = self.request.query_params.get('date_from')
-        date_to = self.request.query_params.get('date_to')
-        if date_from:
-            qs = qs.filter(date__gte=date_from)
-        if date_to:
-            qs = qs.filter(date__lte=date_to)
+class PeriodDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class   = PeriodSerializer
+    permission_classes = [IsAuthenticated]
+    queryset           = Period.objects.all()
 
-        approval_status = self.request.query_params.get('approval_status')
-        if approval_status:
-            qs = qs.filter(approval_status=approval_status)
 
+# ── TEMPORARY LABOURERS ─────────────────────────────────────────
+class TempLabourerListCreateView(generics.ListCreateAPIView):
+    serializer_class   = TemporaryLabourerSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'HR':
+            return TemporaryLabourer.objects.all()
+        if user.role == 'CONTRACTOR':
+            cp = Contractor.objects.filter(user=user).first()
+            if cp:
+                return TemporaryLabourer.objects.filter(contractor=cp)
+        return TemporaryLabourer.objects.none()
+
+
+class TempLabourerDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class   = TemporaryLabourerSerializer
+    permission_classes = [IsAuthenticated]
+    queryset           = TemporaryLabourer.objects.all()
+
+
+# ── CONTRACTOR ATTENDANCE (marked by Supervisors) ────────────────
+class ContractorAttendanceListCreateView(generics.ListCreateAPIView):
+    serializer_class   = ContractorAttendanceSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs   = ContractorAttendance.objects.select_related('contractor__user', 'project')
+
+        if user.role == 'SUPERVISOR':
+            # Only attendance for projects this supervisor manages
+            qs = qs.filter(project__supervisor=user)
+        elif user.role == 'HR':
+            pass  # see all
+        else:
+            return qs.none()
+
+        project_id  = self.request.query_params.get('project')
+        date_filter = self.request.query_params.get('date')
+        contractor_id = self.request.query_params.get('contractor')
+
+        if project_id:    qs = qs.filter(project_id=project_id)
+        if date_filter:   qs = qs.filter(date=date_filter)
+        if contractor_id: qs = qs.filter(contractor_id=contractor_id)
         return qs
 
     def perform_create(self, serializer):
-        # Validate supervisor can mark this labourer
-        user = self.request.user
-        labourer = serializer.validated_data['labourer']
-        if user.role == 'SUPERVISOR':
-            if labourer.contractor and labourer.contractor.supervisor != user:
-                from rest_framework.exceptions import PermissionDenied
-                raise PermissionDenied("You can only mark attendance for labourers under your contractors.")
         serializer.save(marked_by=self.request.user)
 
-    def get_permissions(self):
-        if self.request.method == 'POST':
-            return [IsAuthenticated(), IsHROrSupervisor()]
-        return [IsAuthenticated()]
+
+class ContractorAttendanceBulkView(APIView):
+    """POST bulk attendance records for multiple contractors on one date."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role not in ['SUPERVISOR', 'HR']:
+            return Response({'error': 'Permission denied.'}, status=403)
+
+        records = request.data.get('records', [])
+        created, updated = 0, 0
+
+        for rec in records:
+            obj, was_created = ContractorAttendance.objects.update_or_create(
+                contractor_id=rec['contractor'],
+                project_id=rec['project'],
+                date=rec['date'],
+                defaults={
+                    'status':    rec.get('status', 'PRESENT'),
+                    'notes':     rec.get('notes', ''),
+                    'marked_by': request.user,
+                }
+            )
+            if was_created:
+                created += 1
+            else:
+                updated += 1
+
+        return Response({'created': created, 'updated': updated})
 
 
-class AttendanceDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """GET/PATCH/DELETE /api/attendance/<id>/"""
-    serializer_class = AttendanceSerializer
+class ContractorAttendanceDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class   = ContractorAttendanceSerializer
+    permission_classes = [IsAuthenticated]
+    queryset           = ContractorAttendance.objects.all()
+
+
+# ── LABOURER ATTENDANCE (marked by Contractors) ──────────────────
+class LabourerAttendanceListCreateView(generics.ListCreateAPIView):
+    serializer_class   = LabourerAttendanceSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        qs = Attendance.objects.all()
-        if user.role == 'SUPERVISOR':
-            qs = qs.filter(labourer__contractor__supervisor=user)
-        elif user.role == 'LABOURER':
-            try:
-                qs = qs.filter(labourer=user.labourer_profile)
-            except Exception:
-                return Attendance.objects.none()
+        qs   = LabourerAttendance.objects.select_related(
+            'labourer__user', 'temp_labourer', 'project'
+        )
+
+        if user.role == 'CONTRACTOR':
+            cp = Contractor.objects.filter(user=user).first()
+            if cp:
+                qs = qs.filter(
+                    Q(labourer__contractor=cp) | Q(temp_labourer__contractor=cp)
+                )
+            else:
+                return qs.none()
+        elif user.role == 'SUPERVISOR':
+            qs = qs.filter(project__supervisor=user)
+        elif user.role == 'HR':
+            pass
+        else:
+            return qs.none()
+
+        project_id    = self.request.query_params.get('project')
+        date_filter   = self.request.query_params.get('date')
+        contractor_id = self.request.query_params.get('contractor')
+
+        if project_id:    qs = qs.filter(project_id=project_id)
+        if date_filter:   qs = qs.filter(date=date_filter)
+        if contractor_id:
+            qs = qs.filter(
+                Q(labourer__contractor_id=contractor_id) |
+                Q(temp_labourer__contractor_id=contractor_id)
+            )
         return qs
 
-    def get_permissions(self):
-        if self.request.method in ['PATCH', 'PUT', 'DELETE']:
-            return [IsAuthenticated(), IsHROrSupervisor()]
-        return [IsAuthenticated()]
+    def perform_create(self, serializer):
+        serializer.save(marked_by=self.request.user)
 
 
-class AttendanceApproveView(APIView):
-    """
-    PATCH /api/attendance/<id>/approve/
-    HR approves or rejects a pending attendance record.
-    """
-    permission_classes = [IsAuthenticated, IsHR]
+class LabourerAttendanceBulkView(APIView):
+    """POST bulk attendance for multiple labourers on one date."""
+    permission_classes = [IsAuthenticated]
 
-    def patch(self, request, pk):
-        try:
-            attendance = Attendance.objects.get(pk=pk)
-        except Attendance.DoesNotExist:
-            return Response({'error': 'Attendance record not found.'}, status=404)
+    def post(self, request):
+        if request.user.role not in ['CONTRACTOR', 'HR']:
+            return Response({'error': 'Permission denied.'}, status=403)
 
-        serializer = AttendanceApprovalSerializer(attendance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(approved_by=request.user)
-        return Response(AttendanceSerializer(attendance).data)
+        records = request.data.get('records', [])
+        created, updated = 0, 0
+
+        for rec in records:
+            defaults = {
+                'status':         rec.get('status', 'PRESENT'),
+                'overtime_hours': rec.get('overtime_hours', 0),
+                'notes':          rec.get('notes', ''),
+                'marked_by':      request.user,
+            }
+            if rec.get('labourer'):
+                obj, was_created = LabourerAttendance.objects.update_or_create(
+                    labourer_id=rec['labourer'],
+                    project_id=rec['project'],
+                    date=rec['date'],
+                    defaults=defaults
+                )
+            elif rec.get('temp_labourer'):
+                defaults['temp_labourer_id'] = rec['temp_labourer']
+                obj, was_created = LabourerAttendance.objects.update_or_create(
+                    temp_labourer_id=rec['temp_labourer'],
+                    project_id=rec['project'],
+                    date=rec['date'],
+                    defaults=defaults
+                )
+            else:
+                continue
+
+            if was_created:
+                created += 1
+            else:
+                updated += 1
+
+        return Response({'created': created, 'updated': updated})
 
 
-class AttendanceSummaryView(APIView):
-    """
-    GET /api/attendance/summary/?labourer=<id>&date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
-    Returns aggregate stats for payroll calculation preview.
-    """
+class LabourerAttendanceDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class   = LabourerAttendanceSerializer
+    permission_classes = [IsAuthenticated]
+    queryset           = LabourerAttendance.objects.all()
+
+
+# ── HR MONITORING DASHBOARD ──────────────────────────────────────
+class AttendanceMonitorView(APIView):
+    """HR-only: overview of attendance compliance across all supervisors."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        labourer_id = request.query_params.get('labourer')
-        date_from = request.query_params.get('date_from')
-        date_to = request.query_params.get('date_to')
+        if request.user.role != 'HR':
+            return Response({'error': 'HR only.'}, status=403)
 
-        if not labourer_id:
-            return Response({'error': 'labourer param required.'}, status=400)
+        today       = date.today()
+        date_filter = request.query_params.get('date', str(today))
 
-        qs = Attendance.objects.filter(
-            labourer_id=labourer_id,
-            approval_status='APPROVED'
-        )
-        if date_from:
-            qs = qs.filter(date__gte=date_from)
-        if date_to:
-            qs = qs.filter(date__lte=date_to)
+        projects = Project.objects.filter(status='ACTIVE').select_related('supervisor')
+        summary  = []
 
-        present = qs.filter(status='PRESENT').count()
-        half_day = qs.filter(status='HALF_DAY').count()
-        absent = qs.filter(status='ABSENT').count()
-        total_overtime = qs.aggregate(total=Sum('overtime_hours'))['total'] or 0
-        effective_days = present + (half_day * 0.5)
+        for project in projects:
+            # Contractors assigned to this project's supervisor
+            contractors = Contractor.objects.filter(supervisor=project.supervisor)
+            total_contractors = contractors.count()
+            marked_contractors = ContractorAttendance.objects.filter(
+                project=project, date=date_filter
+            ).count()
 
-        try:
-            labourer = Labourer.objects.get(pk=labourer_id)
-            daily_wage = float(labourer.daily_wage)
-            overtime_rate = float(labourer.overtime_rate)
-            projected_salary = (effective_days * daily_wage) + (float(total_overtime) * overtime_rate)
-        except Labourer.DoesNotExist:
-            projected_salary = 0
+            # Labourers across all these contractors
+            labourers = Labourer.objects.filter(contractor__in=contractors)
+            temp_lab  = TemporaryLabourer.objects.filter(contractor__in=contractors)
+            total_labourers  = labourers.count() + temp_lab.count()
+            marked_labourers = LabourerAttendance.objects.filter(
+                project=project, date=date_filter
+            ).count()
 
-        return Response({
-            'labourer_id': labourer_id,
-            'present_days': present,
-            'half_days': half_day,
-            'absent_days': absent,
-            'effective_days': effective_days,
-            'total_overtime_hours': float(total_overtime),
-            'projected_salary': round(projected_salary, 2),
-        })
+            summary.append({
+                'project_id':         project.id,
+                'project_name':       project.name,
+                'supervisor_id':      project.supervisor_id,
+                'supervisor_name':    str(project.supervisor) if project.supervisor else '—',
+                'contractors_total':  total_contractors,
+                'contractors_marked': marked_contractors,
+                'labourers_total':    total_labourers,
+                'labourers_marked':   marked_labourers,
+                'date':               date_filter,
+            })
+
+        return Response(summary)

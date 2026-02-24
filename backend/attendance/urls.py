@@ -1,13 +1,31 @@
+# attendance/urls.py — REPLACE ENTIRE FILE
+
 from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('', views.AttendanceListCreateView.as_view(), name='attendance-list'),
+    # Projects
+    path('projects/',          views.ProjectListCreateView.as_view(),    name='project-list'),
+    path('projects/<int:pk>/', views.ProjectDetailView.as_view(),        name='project-detail'),
 
-    # CRITICAL: 'summary/' MUST come before '<int:pk>/'
-    # If it comes after, Django tries to cast "summary" to int and fails with 404
-    path('summary/', views.AttendanceSummaryView.as_view(), name='attendance-summary'),
+    # Periods
+    path('periods/',           views.PeriodListCreateView.as_view(),     name='period-list'),
+    path('periods/<int:pk>/',  views.PeriodDetailView.as_view(),         name='period-detail'),
 
-    path('<int:pk>/', views.AttendanceDetailView.as_view(), name='attendance-detail'),
-    path('<int:pk>/approve/', views.AttendanceApproveView.as_view(), name='attendance-approve'),
+    # Temporary Labourers
+    path('temp-labourers/',          views.TempLabourerListCreateView.as_view(), name='temp-labourer-list'),
+    path('temp-labourers/<int:pk>/', views.TempLabourerDetailView.as_view(),     name='temp-labourer-detail'),
+
+    # Contractor Attendance (by Supervisor)
+    path('contractor-attendance/',          views.ContractorAttendanceListCreateView.as_view(), name='contractor-attendance-list'),
+    path('contractor-attendance/bulk/',     views.ContractorAttendanceBulkView.as_view(),       name='contractor-attendance-bulk'),
+    path('contractor-attendance/<int:pk>/', views.ContractorAttendanceDetailView.as_view(),     name='contractor-attendance-detail'),
+
+    # Labourer Attendance (by Contractor)
+    path('labourer-attendance/',          views.LabourerAttendanceListCreateView.as_view(), name='labourer-attendance-list'),
+    path('labourer-attendance/bulk/',     views.LabourerAttendanceBulkView.as_view(),       name='labourer-attendance-bulk'),
+    path('labourer-attendance/<int:pk>/', views.LabourerAttendanceDetailView.as_view(),     name='labourer-attendance-detail'),
+
+    # HR Monitoring
+    path('monitor/', views.AttendanceMonitorView.as_view(), name='attendance-monitor'),
 ]

@@ -1,46 +1,95 @@
+# attendance/serializers.py — REPLACE ENTIRE FILE
+
 from rest_framework import serializers
-from .models import Attendance
-from workforce.serializers import LabourerListSerializer
+from .models import Project, Period, TemporaryLabourer, ContractorAttendance, LabourerAttendance
+from users.models import CustomUser
 
 
-class AttendanceSerializer(serializers.ModelSerializer):
-    labourer_detail = LabourerListSerializer(source='labourer', read_only=True)
-    marked_by_username = serializers.CharField(source='marked_by.username', read_only=True)
-    approved_by_username = serializers.CharField(source='approved_by.username', read_only=True)
-    effective_days = serializers.ReadOnlyField()
+class ProjectSerializer(serializers.ModelSerializer):
+    supervisor_name = serializers.SerializerMethodField()
 
     class Meta:
-        model = Attendance
-        fields = [
-            'id', 'labourer', 'labourer_detail', 'date', 'status',
-            'overtime_hours', 'marked_by', 'marked_by_username',
-            'approval_status', 'approved_by', 'approved_by_username',
-            'effective_days', 'notes', 'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'marked_by', 'approval_status', 'approved_by', 'created_at', 'updated_at']
+        model = Project
+        fields = '__all__'
 
-    def validate_overtime_hours(self, value):
-        if value < 0 or value > 12:
-            raise serializers.ValidationError("Overtime hours must be between 0 and 12.")
-        return value
-
-    def validate(self, data):
-        # Cannot have overtime if absent
-        status = data.get('status', 'PRESENT')
-        overtime = data.get('overtime_hours', 0)
-        if status == 'ABSENT' and overtime > 0:
-            raise serializers.ValidationError("Cannot record overtime for absent labourer.")
-        return data
+    def get_supervisor_name(self, obj):
+        if obj.supervisor:
+            return f"{obj.supervisor.first_name} {obj.supervisor.last_name or obj.supervisor.username}".strip()
+        return None
 
 
-class AttendanceApprovalSerializer(serializers.ModelSerializer):
-    """HR uses this to approve or reject attendance records."""
+class PeriodSerializer(serializers.ModelSerializer):
+    project_name = serializers.CharField(source='project.name', read_only=True)
 
     class Meta:
-        model = Attendance
-        fields = ['approval_status', 'notes']
+        model = Period
+        fields = '__all__'
 
-    def validate_approval_status(self, value):
-        if value not in ['APPROVED', 'REJECTED']:
-            raise serializers.ValidationError("Status must be APPROVED or REJECTED.")
-        return value
+
+class TemporaryLabourerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TemporaryLabourer
+        fields = '__all__'
+
+
+class ContractorAttendanceSerializer(serializers.ModelSerializer):
+    contractor_name = serializers.SerializerMethodField()
+    project_name    = serializers.CharField(source='project.name', read_only=True)
+
+    class Meta:
+        model = ContractorAttendance
+        fields = '__all__'
+        read_only_fields = ['marked_by', 'created_at', 'updated_at']
+
+    def get_contractor_name(self, obj):
+        u = obj.contractor.user
+        return f"{u.first_name} {u.last_name or u.username}".strip()
+
+    def create(self, validated_data):
+        validated_data['marked_by'] = self.context['request'].user
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data['marked_by'] = self.context['request'].user
+        return super().update(instance, validated_data)
+
+
+class LabourerAttendanceSerializer(serializers.ModelSerializer):
+    labourer_name = serializers.SerializerMethodField()
+    is_temp       = serializers.SerializerMethodField()
+    project_name  = serializers.CharField(source='project.name', read_only=True)
+
+    class Meta:
+        model = LabourerAttendance
+        fields = '__all__'
+        read_only_fields = ['marked_by', 'created_at', 'updated_at']
+
+    def get_labourer_name(self, obj):
+        if obj.labourer:
+            u = obj.labourer.user
+            return f"{u.first_name} {u.last_name or u.username}".strip()
+        if obj.temp_labourer:
+            return f"{obj.temp_labourer.name} (Temp)"
+        return "Unknown"
+
+    def get_is_temp(self, obj):
+        return obj.temp_labourer_id is not None
+
+    def create(self, validated_data):
+        validated_data['marked_by'] = self.context['request'].user
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data['marked_by'] = self.context['request'].user
+        return super().update(instance, validated_data)
+
+
+class AttendanceSummarySerializer(serializers.Serializer):
+    """Used by HR admin for monitoring dashboard."""
+    supervisor_id   = serializers.IntegerField()
+    supervisor_name = serializers.CharField()
+    project_name    = serializers.CharField()
+    contractors_total    = serializers.IntegerField()
+    contractors_marked   = serializers.IntegerField()
+    labourers_total      = serializers.IntegerField()
+    labourers_marked     = serializers.IntegerField()
