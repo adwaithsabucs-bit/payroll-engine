@@ -1,50 +1,48 @@
 from rest_framework import serializers
 from .models import Contractor, Labourer
-from users.serializers import UserSerializer
+from users.models import CustomUser
 
+class UserInlineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = CustomUser
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'phone', 'company_name']
 
 class ContractorSerializer(serializers.ModelSerializer):
-    user_detail = UserSerializer(source='user', read_only=True)
-    supervisor_detail = UserSerializer(source='supervisor', read_only=True)
-    labourer_count = serializers.SerializerMethodField()
+    user_detail     = UserInlineSerializer(source='user', read_only=True)
+    supervisor_name = serializers.SerializerMethodField()
+    company_name    = serializers.SerializerMethodField()
+    user = serializers.PrimaryKeyRelatedField(
+        queryset=CustomUser.objects.filter(role='CONTRACTOR'), write_only=True, required=False)
+    supervisor = serializers.PrimaryKeyRelatedField(
+        queryset=CustomUser.objects.filter(role='SUPERVISOR'), allow_null=True, required=False)
 
     class Meta:
-        model = Contractor
-        fields = ['id', 'user', 'user_detail', 'supervisor', 'supervisor_detail',
-                  'company_name', 'contract_number', 'is_active', 'labourer_count', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        model  = Contractor
+        fields = ['id','user','user_detail','supervisor','supervisor_name','company_name','created_at']
 
-    def get_labourer_count(self, obj):
-        return obj.labourers.filter(is_active=True).count()
+    def get_supervisor_name(self, obj):
+        if obj.supervisor:
+            return f"{obj.supervisor.first_name} {obj.supervisor.last_name or obj.supervisor.username}".strip()
+        return None
 
+    def get_company_name(self, obj):
+        return obj.user.company_name if obj.user else ''
 
 class LabourerSerializer(serializers.ModelSerializer):
-    user_detail = UserSerializer(source='user', read_only=True)
-    contractor_detail = ContractorSerializer(source='contractor', read_only=True)
-
-    class Meta:
-        model = Labourer
-        fields = ['id', 'user', 'user_detail', 'contractor', 'contractor_detail',
-                  'daily_wage', 'overtime_rate', 'skill', 'id_number',
-                  'joined_date', 'is_active', 'created_at']
-        read_only_fields = ['id', 'created_at']
-
-
-class LabourerListSerializer(serializers.ModelSerializer):
-    """Lightweight serializer for list views."""
-    full_name = serializers.SerializerMethodField()
-    username = serializers.CharField(source='user.username', read_only=True)
+    user_detail     = UserInlineSerializer(source='user', read_only=True)
     contractor_name = serializers.SerializerMethodField()
+    user = serializers.PrimaryKeyRelatedField(
+        queryset=CustomUser.objects.filter(role='LABOURER'), write_only=True, required=False)
+    contractor = serializers.PrimaryKeyRelatedField(
+        queryset=Contractor.objects.all(), allow_null=True, required=False)
 
     class Meta:
-        model = Labourer
-        fields = ['id', 'full_name', 'username', 'contractor_name',
-                  'daily_wage', 'overtime_rate', 'skill', 'is_active']
-
-    def get_full_name(self, obj):
-        return obj.user.get_full_name() or obj.user.username
+        model  = Labourer
+        fields = ['id','user','user_detail','contractor','contractor_name',
+                  'daily_wage','overtime_rate','skill','created_at']
 
     def get_contractor_name(self, obj):
-        if obj.contractor:
-            return obj.contractor.user.get_full_name() or obj.contractor.user.username
+        if obj.contractor and obj.contractor.user:
+            u = obj.contractor.user
+            return f"{u.first_name} {u.last_name or u.username}".strip()
         return None

@@ -34,6 +34,35 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [IsAuthenticated, IsHR]
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        # Auto-create workforce profile
+        try:
+            from workforce.models import Contractor, Labourer
+            if user.role == 'CONTRACTOR':
+                supervisor_id = request.data.get('supervisor_id')
+                supervisor = CustomUser.objects.filter(id=supervisor_id, role='SUPERVISOR').first() if supervisor_id else None
+                Contractor.objects.get_or_create(user=user, defaults={'supervisor': supervisor})
+            elif user.role == 'LABOURER':
+                contractor_id = request.data.get('contractor_id')
+                contractor = None
+                if contractor_id:
+                    from workforce.models import Contractor as C
+                    contractor = C.objects.filter(id=contractor_id).first()
+                Labourer.objects.get_or_create(user=user, defaults={
+                    'contractor':    contractor,
+                    'daily_wage':    request.data.get('daily_wage', 0),
+                    'overtime_rate': request.data.get('overtime_rate', 0),
+                    'skill':         request.data.get('skill', ''),
+                })
+        except Exception as e:
+            print(f"Workforce profile error: {e}")
+
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+
 
 class ProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
@@ -54,11 +83,6 @@ class UserListView(generics.ListAPIView):
 
 
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    GET/PATCH/DELETE /api/auth/users/<id>/
-    Supports username editing.
-    If an HR admin updates company_name, it propagates to ALL users.
-    """
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated, IsHR]
     queryset = CustomUser.objects.all()
@@ -67,23 +91,44 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance = self.get_object()
         data = request.data.copy()
 
-        # Determine if this is the primary HR admin (lowest id among HR users)
         first_hr = CustomUser.objects.filter(role='HR').order_by('id').first()
         is_primary_admin = first_hr and instance.id == first_hr.id
-
-        # Extract company_name update if provided by primary admin
         new_company = data.get('company_name', None)
 
         serializer = self.get_serializer(instance, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
         updated_user = serializer.save()
 
-        # If primary admin changed company_name, propagate to ALL users
         if is_primary_admin and new_company is not None:
             CustomUser.objects.all().exclude(pk=instance.pk).update(company_name=new_company)
 
-        return Response(UserSerializer(updated_user).data)
+        # Sync workforce profile
+        try:
+            from workforce.models import Contractor, Labourer
+            if instance.role == 'CONTRACTOR':
+                c, _ = Contractor.objects.get_or_create(user=instance)
+                sid = data.get('supervisor_id')
+                if sid:
+                    sv = CustomUser.objects.filter(id=sid, role='SUPERVISOR').first()
+                    if sv:
+                        c.supervisor = sv
+                        c.save()
+            elif instance.role == 'LABOURER':
+                l, _ = Labourer.objects.get_or_create(user=instance)
+                cid = data.get('contractor_id')
+                if cid:
+                    from workforce.models import Contractor as C
+                    ct = C.objects.filter(id=cid).first()
+                    if ct:
+                        l.contractor = ct
+                if 'daily_wage'    in data: l.daily_wage    = data['daily_wage']
+                if 'overtime_rate' in data: l.overtime_rate = data['overtime_rate']
+                if 'skill'         in data: l.skill         = data['skill']
+                l.save()
+        except Exception as e:
+            print(f"Workforce sync error: {e}")
 
+        return Response(UserSerializer(updated_user).data)
 
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]

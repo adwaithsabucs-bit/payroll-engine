@@ -55,13 +55,14 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError('Invalid username or password.')
         if not user.is_active:
             raise serializers.ValidationError('This account is inactive.')
+        if user.role == 'LABOURER':
+            raise serializers.ValidationError('Labourers do not have system access.')
         refresh = RefreshToken.for_user(user)
         return {
             'user': UserSerializer(user).data,
             'access': str(refresh.access_token),
             'refresh': str(refresh),
         }
-
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True)

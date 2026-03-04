@@ -8,10 +8,6 @@ urlpatterns = [
     path('projects/',          views.ProjectListCreateView.as_view(),    name='project-list'),
     path('projects/<int:pk>/', views.ProjectDetailView.as_view(),        name='project-detail'),
 
-    # Periods
-    path('periods/',           views.PeriodListCreateView.as_view(),     name='period-list'),
-    path('periods/<int:pk>/',  views.PeriodDetailView.as_view(),         name='period-detail'),
-
     # Temporary Labourers
     path('temp-labourers/',          views.TempLabourerListCreateView.as_view(), name='temp-labourer-list'),
     path('temp-labourers/<int:pk>/', views.TempLabourerDetailView.as_view(),     name='temp-labourer-detail'),

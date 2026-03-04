@@ -68,13 +68,14 @@ class ContractorPayroll(models.Model):
 
 
 class LabourerPayroll(models.Model):
-    """Per-period attendance-based payroll for Labourers (fixed + temp)."""
+    """Per-project attendance-based payroll for Labourers (fixed + temp)."""
     STATUS_CHOICES = [('PENDING','Pending'),('APPROVED','Approved'),('PAID','Paid')]
 
     labourer      = models.ForeignKey('workforce.Labourer', on_delete=models.CASCADE, related_name='payrolls', null=True, blank=True)
     temp_labourer = models.ForeignKey('attendance.TemporaryLabourer', on_delete=models.CASCADE, related_name='payrolls', null=True, blank=True)
     project       = models.ForeignKey('attendance.Project', on_delete=models.CASCADE, related_name='labourer_payrolls')
-    period        = models.ForeignKey('attendance.Period', on_delete=models.CASCADE, related_name='labourer_payrolls')
+    start_date    = models.DateField()
+    end_date      = models.DateField()
 
     days_present   = models.DecimalField(max_digits=5, decimal_places=1, default=0)
     daily_wage     = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -101,23 +102,23 @@ class LabourerPayroll(models.Model):
         if self.labourer:
             records = LabourerAttendance.objects.filter(
                 labourer=self.labourer, project=self.project,
-                date__gte=self.period.start_date, date__lte=self.period.end_date,
+                date__gte=self.start_date, date__lte=self.end_date,
             )
             self.daily_wage    = self.labourer.daily_wage
             self.overtime_rate = self.labourer.overtime_rate
         elif self.temp_labourer:
             records = LabourerAttendance.objects.filter(
                 temp_labourer=self.temp_labourer, project=self.project,
-                date__gte=self.period.start_date, date__lte=self.period.end_date,
+                date__gte=self.start_date, date__lte=self.end_date,
             )
             self.daily_wage    = self.temp_labourer.daily_wage
             self.overtime_rate = 0
         else:
             return
         self.days_present   = sum(1 if r.status=='PRESENT' else 0.5 if r.status=='HALF_DAY' else 0 for r in records)
-        self.overtime_hours = sum(r.overtime_hours for r in records)
+        self.overtime_hours = sum(r.overtime_hours or 0 for r in records)
         self.save()
 
     def __str__(self):
         who = self.labourer or self.temp_labourer
-        return f"Labourer: {who} — {self.period}"
+        return f"Labourer: {who} — {self.start_date} to {self.end_date}"
