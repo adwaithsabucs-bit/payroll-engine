@@ -166,7 +166,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 letterSpacing: 0.5,
                 textTransform: 'uppercase',
               }}>
-                PayrollEngine
+                PAYROLLENGINE
               </div>
               <div style={{ fontSize: 10, color: '#3f3f46', letterSpacing: 2, textTransform: 'uppercase' }}>
                 Construction Wages

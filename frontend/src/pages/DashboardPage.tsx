@@ -23,18 +23,14 @@ const DashboardPage = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Use direct apiClient calls with correct endpoints
         const [labRes, conRes] = await Promise.all([
           apiClient.get('/workforce/labourers/'),
           apiClient.get('/workforce/contractors/'),
         ]);
-
         const labourers   = extractResults<any>(labRes.data).length;
         const contractors = extractResults<any>(conRes.data).length;
 
-        // Fetch payroll data — combine all three types
         let pending = 0, approved = 0, totalWages = 0, attendance = 0;
-
         try {
           const [supPay, conPay, labPay] = await Promise.all([
             apiClient.get('/payroll/supervisor/'),
@@ -51,7 +47,6 @@ const DashboardPage = () => {
           totalWages = allPayrolls.reduce((s, p) => s + parseFloat(p.total_amount || 0), 0);
         } catch (e) { console.warn('Payroll fetch partial error:', e); }
 
-        // Attendance count — try projects as a proxy
         try {
           const attRes = await apiClient.get('/attendance/projects/');
           attendance = extractResults<any>(attRes.data).length;
@@ -68,12 +63,12 @@ const DashboardPage = () => {
   }, []);
 
   const cards = [
-    { label: 'Labourers',        value: stats.labourers,        suffix: '',  icon: Users,         color: '#dc2626' },
-    { label: 'Contractors',      value: stats.contractors,      suffix: '',  icon: HardHat,       color: '#2563eb' },
-    { label: 'Active Projects',  value: stats.attendance,       suffix: '',  icon: ClipboardList, color: '#d97706' },
-    { label: 'Pending Payroll',  value: stats.pending_payroll,  suffix: '',  icon: AlertCircle,   color: '#dc2626' },
-    { label: 'Approved Payroll', value: stats.approved_payroll, suffix: '',  icon: TrendingUp,    color: '#16a34a' },
-    { label: 'Total Wages',      value: Math.round(stats.total_wages), suffix: '₹', icon: DollarSign, color: '#d97706' },
+    { label: 'Labourers',        value: stats.labourers,              suffix: '',  icon: Users,         color: '#dc2626' },
+    { label: 'Contractors',      value: stats.contractors,            suffix: '',  icon: HardHat,       color: '#2563eb' },
+    { label: 'Active Projects',  value: stats.attendance,             suffix: '',  icon: ClipboardList, color: '#d97706' },
+    { label: 'Pending Payroll',  value: stats.pending_payroll,        suffix: '',  icon: AlertCircle,   color: '#dc2626' },
+    { label: 'Approved Payroll', value: stats.approved_payroll,       suffix: '',  icon: TrendingUp,    color: '#16a34a' },
+    { label: 'Total Wages',      value: Math.round(stats.total_wages),suffix: '₹', icon: DollarSign,    color: '#d97706' },
   ];
 
   return (
@@ -81,34 +76,55 @@ const DashboardPage = () => {
       <style>{`
         .dash-root { animation: pageIn 0.4s cubic-bezier(0.16,1,0.3,1); }
         @keyframes pageIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
-        .dash-header { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:40px; padding-bottom:28px; border-bottom:1px solid #161616; position:relative; }
+
+        .dash-header { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:40px; padding-bottom:28px; border-bottom:1px solid #2a2a2a; position:relative; }
         .dash-header::after { content:''; position:absolute; bottom:-1px; left:0; width:64px; height:3px; background:#dc2626; }
+
+        /* ✅ Greeting visible */
+        .dash-greeting { font-size:11px; letter-spacing:4px; text-transform:uppercase; color:#a1a1aa; margin-bottom:8px; font-weight:600; }
+
         .dash-title { font-family:'Barlow Condensed',sans-serif; font-size:56px; font-weight:900; color:white; text-transform:uppercase; letter-spacing:-2px; line-height:1; }
         .dash-title em { font-style:normal; color:#dc2626; }
-        .dash-greeting { font-size:11px; letter-spacing:4px; text-transform:uppercase; color:#3f3f46; margin-bottom:8px; font-weight:600; }
+
         .dash-clock { font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:700; color:white; letter-spacing:-1px; line-height:1; }
-        .dash-date { font-size:11px; color:#3f3f46; letter-spacing:2px; text-transform:uppercase; margin-top:4px; }
+
+        /* ✅ Date visible */
+        .dash-date { font-size:11px; color:#a1a1aa; letter-spacing:2px; text-transform:uppercase; margin-top:4px; }
+
         .dash-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:2px; margin-bottom:40px; }
-        .dash-stat { background:#0d0d0d; border:1px solid #161616; padding:28px 24px; position:relative; overflow:hidden; transition:all 0.2s; cursor:default; }
+        .dash-stat { background:#0d0d0d; border:1px solid #1e1e1e; padding:28px 24px; position:relative; overflow:hidden; transition:all 0.2s; cursor:default; }
         .dash-stat::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--stat-color,#dc2626); transform:scaleX(0); transform-origin:left; transition:transform 0.3s ease; }
         .dash-stat:hover::before { transform:scaleX(1); }
-        .dash-stat:hover { background:#111; border-color:#222; transform:translateY(-2px); }
-        .dash-stat-ghost { position:absolute; right:-10px; bottom:-20px; font-family:'Barlow Condensed',sans-serif; font-size:100px; font-weight:900; color:rgba(255,255,255,0.02); line-height:1; pointer-events:none; user-select:none; }
-        .dash-stat-icon { width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.04); border:1px solid #1e1e1e; margin-bottom:20px; }
-        .dash-stat-label { font-family:'Barlow Condensed',sans-serif; font-size:10px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:#3f3f46; margin-bottom:10px; }
+        .dash-stat:hover { background:#111; border-color:#333; transform:translateY(-2px); }
+
+        .dash-stat-ghost { position:absolute; right:-10px; bottom:-20px; font-family:'Barlow Condensed',sans-serif; font-size:100px; font-weight:900; color:rgba(255,255,255,0.03); line-height:1; pointer-events:none; user-select:none; }
+        .dash-stat-icon { width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.05); border:1px solid #2a2a2a; margin-bottom:20px; }
+
+        /* ✅ Card labels visible */
+        .dash-stat-label { font-family:'Barlow Condensed',sans-serif; font-size:10px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:#a1a1aa; margin-bottom:10px; }
+
         .dash-stat-value { font-family:'Barlow Condensed',sans-serif; font-size:56px; font-weight:900; color:white; line-height:1; letter-spacing:-2px; }
+
         .dash-section-head { display:flex; align-items:center; gap:14px; margin-bottom:20px; }
         .dash-section-line { width:32px; height:2px; background:#dc2626; }
-        .dash-section-title { font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:#52525b; }
+
+        /* ✅ Section title visible */
+        .dash-section-title { font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:#a1a1aa; }
+
         .dash-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
-        .dash-info-card { background:#0d0d0d; border:1px solid #161616; padding:24px; }
-        .dash-info-card-title { font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:#3f3f46; margin-bottom:16px; }
-        .dash-info-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #111; font-size:13px; color:#71717a; }
+        .dash-info-card { background:#0d0d0d; border:1px solid #1e1e1e; padding:24px; }
+
+        /* ✅ Info card titles visible */
+        .dash-info-card-title { font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:#a1a1aa; margin-bottom:16px; }
+
+        .dash-info-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #1a1a1a; font-size:13px; color:#a1a1aa; }
         .dash-info-row:last-child { border-bottom:none; }
         .dash-info-row strong { color:white; font-weight:600; }
+
         .dash-role-badge { display:inline-block; padding:2px 10px; font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; background:rgba(220,38,38,0.1); color:#f87171; }
-        .dash-loading { display:flex; align-items:center; gap:14px; padding:80px 40px; color:#3f3f46; font-family:'Barlow Condensed',sans-serif; font-size:14px; letter-spacing:3px; text-transform:uppercase; }
-        .dash-loading-bar { width:48px; height:2px; background:#161616; position:relative; overflow:hidden; }
+
+        .dash-loading { display:flex; align-items:center; gap:14px; padding:80px 40px; color:#a1a1aa; font-family:'Barlow Condensed',sans-serif; font-size:14px; letter-spacing:3px; text-transform:uppercase; }
+        .dash-loading-bar { width:48px; height:2px; background:#1e1e1e; position:relative; overflow:hidden; }
         .dash-loading-bar::after { content:''; position:absolute; inset-block:0; left:-100%; width:100%; background:#dc2626; animation:loadBar 1s ease infinite; }
         @keyframes loadBar { to { left:100%; } }
       `}</style>
@@ -147,7 +163,7 @@ const DashboardPage = () => {
                     <div className="dash-stat-icon"><Icon size={16} color={card.color}/></div>
                     <div className="dash-stat-label">{card.label}</div>
                     <div className="dash-stat-value">
-                      {card.suffix && <span style={{ fontSize:20, color:'#3f3f46', marginRight:4 }}>{card.suffix}</span>}
+                      {card.suffix && <span style={{ fontSize:20, color:'#71717a', marginRight:4 }}>{card.suffix}</span>}
                       {card.value.toLocaleString('en-IN')}
                     </div>
                   </div>

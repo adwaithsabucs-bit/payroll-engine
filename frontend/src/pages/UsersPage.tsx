@@ -497,7 +497,8 @@ export default function UsersPage() {
           <div style={{ position:'absolute', bottom:-1, left:0, width:64, height:3, background:'#dc2626', borderRadius:2 }}/>
           <div>
             <div style={{ fontSize:10, letterSpacing:4, textTransform:'uppercase', color:'#71717a', marginBottom:6, fontWeight:600 }}>Administration</div>
-            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:44, fontWeight:900, color:'white', textTransform:'uppercase', letterSpacing:-1, lineHeight:1 }}>User Management</div>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:44, fontWeight:900, color:'white', textTransform:'uppercase', letterSpacing:-1, lineHeight:1 }}>User
+               Management</div>
             {globalCompany && (
               <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:8 }}>
                 <span style={{ fontSize:11, color:'#52525b' }}>Company:</span>

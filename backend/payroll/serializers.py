@@ -1,4 +1,4 @@
-# payroll/serializers.py — REPLACE ENTIRE FILE
+# backend/payroll/serializers.py — REPLACE ENTIRE FILE
 
 from rest_framework import serializers
 from .models import SupervisorPayroll, ContractorPayroll, LabourerPayroll
@@ -9,7 +9,7 @@ class SupervisorPayrollSerializer(serializers.ModelSerializer):
     project_name    = serializers.CharField(source='project.name', read_only=True)
 
     class Meta:
-        model = SupervisorPayroll
+        model  = SupervisorPayroll
         fields = '__all__'
         read_only_fields = ['total_amount', 'created_by', 'created_at', 'updated_at']
 
@@ -21,10 +21,9 @@ class SupervisorPayrollSerializer(serializers.ModelSerializer):
 class ContractorPayrollSerializer(serializers.ModelSerializer):
     contractor_name = serializers.SerializerMethodField()
     project_name    = serializers.CharField(source='project.name', read_only=True)
-    period_name     = serializers.CharField(source='period.name', read_only=True)
 
     class Meta:
-        model = ContractorPayroll
+        model  = ContractorPayroll
         fields = '__all__'
         read_only_fields = ['total_amount', 'created_by', 'created_at', 'updated_at']
 
@@ -37,10 +36,9 @@ class LabourerPayrollSerializer(serializers.ModelSerializer):
     labourer_name = serializers.SerializerMethodField()
     is_temp       = serializers.SerializerMethodField()
     project_name  = serializers.CharField(source='project.name', read_only=True)
-    period_name   = serializers.CharField(source='period.name', read_only=True)
 
     class Meta:
-        model = LabourerPayroll
+        model  = LabourerPayroll
         fields = '__all__'
         read_only_fields = ['total_amount', 'created_by', 'created_at', 'updated_at']
 
