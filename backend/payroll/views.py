@@ -4,12 +4,12 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Q
 from .models import SupervisorPayroll, ContractorPayroll, LabourerPayroll
 from .serializers import (
     SupervisorPayrollSerializer, ContractorPayrollSerializer, LabourerPayrollSerializer
 )
-from attendance.models import Project, Period
+from attendance.models import Project
 from workforce.models import Contractor, Labourer
 from users.models import CustomUser
 
@@ -21,7 +21,7 @@ class SupervisorPayrollListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = SupervisorPayroll.objects.select_related('supervisor', 'project')
+        qs   = SupervisorPayroll.objects.select_related('supervisor', 'project')
         if user.role == 'SUPERVISOR':
             qs = qs.filter(supervisor=user)
         elif user.role != 'HR':
@@ -48,7 +48,8 @@ class ContractorPayrollListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = ContractorPayroll.objects.select_related('contractor__user', 'project', 'period')
+        # 'period' IS a valid FK on ContractorPayroll
+        qs   = ContractorPayroll.objects.select_related('contractor__user', 'project', 'period')
         if user.role == 'CONTRACTOR':
             cp = Contractor.objects.filter(user=user).first()
             if cp:
@@ -83,8 +84,10 @@ class LabourerPayrollListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = LabourerPayroll.objects.select_related(
-            'labourer__user', 'temp_labourer', 'project', 'period'
+        # FIX: LabourerPayroll has NO 'period' FK field — removed from select_related.
+        # It uses start_date / end_date date fields instead of a Period relation.
+        qs   = LabourerPayroll.objects.select_related(
+            'labourer__user', 'temp_labourer', 'project'
         )
         if user.role == 'CONTRACTOR':
             cp = Contractor.objects.filter(user=user).first()
@@ -100,9 +103,7 @@ class LabourerPayrollListCreateView(generics.ListCreateAPIView):
             return qs.none()
 
         project_id = self.request.query_params.get('project')
-        period_id  = self.request.query_params.get('period')
         if project_id: qs = qs.filter(project_id=project_id)
-        if period_id:  qs = qs.filter(period_id=period_id)
         return qs
 
     def perform_create(self, serializer):
@@ -116,7 +117,6 @@ class LabourerPayrollDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class LabourerPayrollAutoCalculateView(APIView):
-    """POST /api/payroll/labourer/<id>/calculate/ — auto-calc from attendance."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
@@ -138,24 +138,24 @@ class PayrollDashboardView(APIView):
 
         if user.role == 'HR':
             data['supervisor_payrolls'] = {
-                'total':    SupervisorPayroll.objects.count(),
-                'pending':  SupervisorPayroll.objects.filter(status='PENDING').count(),
-                'approved': SupervisorPayroll.objects.filter(status='APPROVED').count(),
-                'paid':     SupervisorPayroll.objects.filter(status='PAID').count(),
+                'total':        SupervisorPayroll.objects.count(),
+                'pending':      SupervisorPayroll.objects.filter(status='PENDING').count(),
+                'approved':     SupervisorPayroll.objects.filter(status='APPROVED').count(),
+                'paid':         SupervisorPayroll.objects.filter(status='PAID').count(),
                 'total_amount': SupervisorPayroll.objects.aggregate(t=Sum('total_amount'))['t'] or 0,
             }
             data['contractor_payrolls'] = {
-                'total':    ContractorPayroll.objects.count(),
-                'pending':  ContractorPayroll.objects.filter(status='PENDING').count(),
-                'approved': ContractorPayroll.objects.filter(status='APPROVED').count(),
-                'paid':     ContractorPayroll.objects.filter(status='PAID').count(),
+                'total':        ContractorPayroll.objects.count(),
+                'pending':      ContractorPayroll.objects.filter(status='PENDING').count(),
+                'approved':     ContractorPayroll.objects.filter(status='APPROVED').count(),
+                'paid':         ContractorPayroll.objects.filter(status='PAID').count(),
                 'total_amount': ContractorPayroll.objects.aggregate(t=Sum('total_amount'))['t'] or 0,
             }
             data['labourer_payrolls'] = {
-                'total':    LabourerPayroll.objects.count(),
-                'pending':  LabourerPayroll.objects.filter(status='PENDING').count(),
-                'approved': LabourerPayroll.objects.filter(status='APPROVED').count(),
-                'paid':     LabourerPayroll.objects.filter(status='PAID').count(),
+                'total':        LabourerPayroll.objects.count(),
+                'pending':      LabourerPayroll.objects.filter(status='PENDING').count(),
+                'approved':     LabourerPayroll.objects.filter(status='APPROVED').count(),
+                'paid':         LabourerPayroll.objects.filter(status='PAID').count(),
                 'total_amount': LabourerPayroll.objects.aggregate(t=Sum('total_amount'))['t'] or 0,
             }
             data['active_projects'] = Project.objects.filter(status='ACTIVE').count()
@@ -163,9 +163,9 @@ class PayrollDashboardView(APIView):
         elif user.role == 'SUPERVISOR':
             my_payrolls = SupervisorPayroll.objects.filter(supervisor=user)
             data['my_payrolls'] = {
-                'total': my_payrolls.count(),
+                'total':        my_payrolls.count(),
                 'total_earned': my_payrolls.aggregate(t=Sum('total_amount'))['t'] or 0,
-                'pending': my_payrolls.filter(status='PENDING').count(),
+                'pending':      my_payrolls.filter(status='PENDING').count(),
             }
             data['projects'] = Project.objects.filter(supervisor=user).count()
 
@@ -174,9 +174,9 @@ class PayrollDashboardView(APIView):
             if cp:
                 my_payrolls = ContractorPayroll.objects.filter(contractor=cp)
                 data['my_payrolls'] = {
-                    'total': my_payrolls.count(),
+                    'total':        my_payrolls.count(),
                     'total_earned': my_payrolls.aggregate(t=Sum('total_amount'))['t'] or 0,
-                    'pending': my_payrolls.filter(status='PENDING').count(),
+                    'pending':      my_payrolls.filter(status='PENDING').count(),
                 }
 
         return Response(data)

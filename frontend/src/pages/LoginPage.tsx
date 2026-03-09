@@ -1,35 +1,196 @@
 // frontend/src/pages/LoginPage.tsx — REPLACE ENTIRE FILE
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+type Step = 'credentials' | 'pin';
+
+// ── 4-digit PIN input component ──────────────────────────────────
+
+interface PINBoxesProps {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  autoFocus?: boolean;
+}
+const PINBoxes = ({ label, value, onChange, autoFocus }: PINBoxesProps) => {
+  const refs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null),
+                useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
+
+  useEffect(() => {
+    if (autoFocus) refs[0].current?.focus();
+  }, [autoFocus]);
+
+  const handleKey = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace') {
+      if (value[i]) {
+        // clear this box
+        const arr = value.split('');
+        arr[i] = '';
+        onChange(arr.join(''));
+      } else if (i > 0) {
+        // move to previous
+        refs[i - 1].current?.focus();
+        const arr = value.split('');
+        arr[i - 1] = '';
+        onChange(arr.join(''));
+      }
+      e.preventDefault();
+    }
+  };
+
+  const handleChange = (i: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const ch = e.target.value.replace(/\D/g, '').slice(-1);
+    if (!ch) return;
+    const arr = (value + '    ').slice(0, 4).split('');
+    arr[i] = ch;
+    const next = arr.join('').replace(/ /g, '');
+    onChange(arr.join(''));
+    if (i < 3) refs[i + 1].current?.focus();
+  };
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <label style={{ display: 'block', fontSize: 9, letterSpacing: 4, textTransform: 'uppercase' as const, color: '#3f3f46', fontWeight: 600, marginBottom: 14 }}>{label}</label>
+      <div style={{ display: 'flex', gap: 12 }}>
+        {[0, 1, 2, 3].map(i => {
+          const filled = !!(value[i] && value[i].trim());
+          return (
+            <input
+              key={i}
+              ref={refs[i]}
+              type="text"
+              inputMode="numeric"
+              maxLength={1}
+              value={''}
+              onKeyDown={e => handleKey(i, e)}
+              onChange={e => handleChange(i, e)}
+              style={{
+                width: 56, height: 64,
+                background: filled ? '#1a1a1a' : '#141414',
+                border: `1px solid ${filled ? '#dc2626' : '#1e1e1e'}`,
+                borderBottom: `2px solid ${filled ? '#dc2626' : '#222'}`,
+                color: 'white', textAlign: 'center', fontSize: filled ? 28 : 14,
+                outline: 'none', transition: 'all 0.15s',
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontWeight: 900, letterSpacing: 0,
+              }}
+              placeholder={filled ? '' : '—'}
+            />
+          );
+        })}
+        {/* Show filled dots overlay - just visual indicator */}
+      </div>
+      {/* Dots representation */}
+      <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} style={{ width: 56, display: 'flex', justifyContent: 'center' }}>
+            <div style={{
+              width: value[i]?.trim() ? 8 : 4,
+              height: value[i]?.trim() ? 8 : 4,
+              borderRadius: '50%',
+              background: value[i]?.trim() ? '#dc2626' : '#2a2a2a',
+              transition: 'all 0.15s',
+              marginTop: value[i]?.trim() ? 0 : 2,
+            }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ── Main Page ────────────────────────────────────────────────────
+
 const LoginPage = () => {
-  const { login } = useAuth();
+  const { loginStep1, loginStep2 } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ username: '', password: '' });
-  const [error, setError] = useState('');
+
+  const [step, setStep]                   = useState<Step>('credentials');
+  const [form, setForm]                   = useState({ username: '', password: '' });
+  const [preAuthToken, setPreAuthToken]   = useState('');
+  const [pinIsSet, setPinIsSet]           = useState(false);
+  const [displayName, setDisplayName]     = useState('');
+
+  // PIN inputs (4 digits each)
+  const [pin, setPin]           = useState('');
+  const [newPin, setNewPin]     = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+
+  const [error, setError]   = useState('');
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setTimeout(() => setMounted(true), 50); }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // ── Step 1: credentials ────────────────────────────
+  const handleCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await login(form.username, form.password);
-      navigate('/dashboard');
+      const data = await loginStep1(form.username, form.password);
+      setPreAuthToken(data.pre_auth_token);
+      setPinIsSet(data.pin_is_set);
+      setDisplayName(data.username);
+      setStep('pin');
     } catch (err: any) {
       setError(
         err.response?.data?.non_field_errors?.[0] ||
         err.response?.data?.detail ||
+        Object.values(err.response?.data || {})[0] as string ||
         'Invalid credentials. Try again.'
       );
     } finally {
       setLoading(false);
     }
+  };
+
+  // ── Step 2: PIN verify / set ───────────────────────
+  const handlePIN = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    // Client-side validation
+    if (pinIsSet) {
+      if (pin.replace(/\s/g, '').length !== 4) { setError('Enter all 4 digits.'); return; }
+    } else {
+      if (newPin.replace(/\s/g, '').length !== 4)  { setError('Set all 4 digits for your new PIN.'); return; }
+      if (confirmPin.replace(/\s/g, '').length !== 4) { setError('Confirm all 4 digits.'); return; }
+      if (newPin !== confirmPin) { setError('PINs do not match.'); return; }
+    }
+
+    setLoading(true);
+    try {
+      if (pinIsSet) {
+        await loginStep2(preAuthToken, { pin: pin.replace(/\s/g, '') });
+      } else {
+        await loginStep2(preAuthToken, {
+          new_pin:     newPin.replace(/\s/g, ''),
+          confirm_pin: confirmPin.replace(/\s/g, ''),
+        });
+      }
+      navigate('/dashboard');
+    } catch (err: any) {
+      const d = err.response?.data;
+      if (d) {
+        setError(
+          d.pin?.[0] || d.new_pin?.[0] || d.confirm_pin?.[0] ||
+          d.non_field_errors?.[0] || d.detail || 'Incorrect PIN. Try again.'
+        );
+      } else {
+        setError('Verification failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const goBack = () => {
+    setStep('credentials');
+    setPin(''); setNewPin(''); setConfirmPin('');
+    setError(''); setPreAuthToken('');
   };
 
   return (
@@ -169,6 +330,22 @@ const LoginPage = () => {
         .lp-btn:hover { background: #b91c1c; }
         .lp-btn:disabled { background: #27272a; cursor: not-allowed; clip-path: none; }
 
+        .lp-back {
+          width: 100%; background: transparent; color: #52525b; border: 1px solid #1e1e1e;
+          padding: 12px; margin-top: 12px;
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: 12px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase;
+          cursor: pointer; transition: all 0.2s;
+        }
+        .lp-back:hover { border-color: #dc2626; color: #dc2626; }
+
+        .lp-user-chip {
+          display: inline-flex; align-items: center; gap: 8px;
+          background: #141414; border: 1px solid #1e1e1e;
+          padding: 8px 14px; margin-bottom: 28px;
+        }
+        .lp-user-dot { width: 7px; height: 7px; background: #4ade80; border-radius: 50%; }
+
         .lp-footer { margin-top: 36px; padding-top: 24px; border-top: 1px solid #1a1a1a; display: flex; align-items: center; gap: 10px; }
         .lp-diamond { width: 7px; height: 7px; background: #dc2626; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); flex-shrink: 0; }
         .lp-footer p { font-size: 10px; color: #27272a; letter-spacing: 1px; line-height: 1.6; }
@@ -176,10 +353,13 @@ const LoginPage = () => {
         .lp-spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,0.2); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 8px; vertical-align: middle; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        .lp-pin-box:focus { border-bottom-color: #dc2626 !important; background: #1e1e1e !important; }
+
         @media (max-width: 860px) { .lp-left { display: none; } .lp-right { width: 100%; } }
       `}</style>
 
       <div className="lp-root">
+        {/* ── Left panel ── */}
         <div className={`lp-left ${mounted ? 'in' : ''}`}>
           <div className="lp-ghost">PE</div>
           <div className="lp-logo">
@@ -218,8 +398,8 @@ const LoginPage = () => {
               <div className="lp-stat-l">User Roles</div>
             </div>
             <div>
-              <div className="lp-stat-n">100<em>%</em></div>
-              <div className="lp-stat-l">Digital</div>
+              <div className="lp-stat-n">2<em>FA</em></div>
+              <div className="lp-stat-l">PIN Security</div>
             </div>
             <div>
               <div className="lp-stat-n">0<em>₹</em></div>
@@ -228,31 +408,79 @@ const LoginPage = () => {
           </div>
         </div>
 
+        {/* ── Right panel ── */}
         <div className={`lp-right ${mounted ? 'in' : ''}`}>
           <div className="lp-form">
-            <div className="lp-form-eye">Secure Access Portal</div>
-            <div className="lp-form-title">Sign In</div>
-            <form onSubmit={handleSubmit}>
-              <div className="lp-field">
-                <label className="lp-label">Username</label>
-                <input className="lp-input" type="text" placeholder="your username"
-                  value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} required />
-              </div>
-              <div className="lp-field">
-                <label className="lp-label">Password</label>
-                <input className="lp-input" type="password" placeholder="your password"
-                  value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />
-              </div>
-              {error && <div className="lp-error">{error}</div>}
-              <button className="lp-btn" type="submit" disabled={loading}>
-                {loading && <span className="lp-spinner" />}
-                {loading ? 'Authenticating...' : 'Access System →'}
-              </button>
-            </form>
-            <div className="lp-footer">
-              <div className="lp-diamond" />
-              <p>Secured with JWT · Role-based access control<br />HR · Supervisor · Contractor · Labourer</p>
-            </div>
+
+            {/* ── Step 1: Credentials ── */}
+            {step === 'credentials' && (
+              <>
+                <div className="lp-form-eye">Secure Access Portal</div>
+                <div className="lp-form-title">Sign In</div>
+                <form onSubmit={handleCredentials}>
+                  <div className="lp-field">
+                    <label className="lp-label">Username</label>
+                    <input className="lp-input" type="text" placeholder="your username"
+                      value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} required autoFocus />
+                  </div>
+                  <div className="lp-field">
+                    <label className="lp-label">Password</label>
+                    <input className="lp-input" type="password" placeholder="your password"
+                      value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />
+                  </div>
+                  {error && <div className="lp-error">{error}</div>}
+                  <button className="lp-btn" type="submit" disabled={loading}>
+                    {loading && <span className="lp-spinner" />}
+                    {loading ? 'Verifying...' : 'Continue →'}
+                  </button>
+                </form>
+                <div className="lp-footer">
+                  <div className="lp-diamond" />
+                  <p>Two-step authentication · Role-based access<br />HR · Supervisor · Contractor</p>
+                </div>
+              </>
+            )}
+
+            {/* ── Step 2: PIN ── */}
+            {step === 'pin' && (
+              <>
+                <div className="lp-form-eye">{pinIsSet ? 'Security PIN' : 'Set Your PIN'}</div>
+                <div className="lp-form-title">{pinIsSet ? 'Enter PIN' : 'Create PIN'}</div>
+
+                {/* Authenticated user chip */}
+                <div className="lp-user-chip">
+                  <div className="lp-user-dot" />
+                  <span style={{ fontSize: 12, color: 'white', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 2, textTransform: 'uppercase' as const }}>
+                    {displayName}
+                  </span>
+                  <span style={{ fontSize: 10, color: '#52525b', marginLeft: 4 }}>credentials verified</span>
+                </div>
+
+                {!pinIsSet && (
+                  <div style={{ background: 'rgba(220,38,38,0.06)', borderLeft: '3px solid #dc2626', padding: '10px 14px', marginBottom: 24, fontSize: 12, color: '#fca5a5', lineHeight: 1.6 }}>
+                    First login — set a 4-digit security PIN. You'll need it every time you sign in.
+                  </div>
+                )}
+
+                <form onSubmit={handlePIN}>
+                  {pinIsSet ? (
+                    <PINBoxes label="Security PIN" value={pin} onChange={setPin} autoFocus />
+                  ) : (
+                    <>
+                      <PINBoxes label="New PIN" value={newPin} onChange={setNewPin} autoFocus />
+                      <PINBoxes label="Confirm PIN" value={confirmPin} onChange={setConfirmPin} />
+                    </>
+                  )}
+                  {error && <div className="lp-error">{error}</div>}
+                  <button className="lp-btn" type="submit" disabled={loading}>
+                    {loading && <span className="lp-spinner" />}
+                    {loading ? 'Verifying...' : pinIsSet ? 'Access System →' : 'Set PIN & Enter →'}
+                  </button>
+                  <button type="button" className="lp-back" onClick={goBack}>← Back</button>
+                </form>
+              </>
+            )}
+
           </div>
         </div>
       </div>
