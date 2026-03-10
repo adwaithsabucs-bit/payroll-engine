@@ -5,7 +5,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Users, ClipboardList, DollarSign,
-  LogOut, HardHat, User, ChevronRight, Menu
+  LogOut, HardHat, User, ChevronRight, Menu, TreePine
 } from 'lucide-react';
 
 const SIDEBAR_WIDTH = 260;
@@ -24,6 +24,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['HR'] },
     { path: '/users',     label: 'Users',     icon: Users,           roles: ['HR'] },
+    { path: '/hierarchy', label: 'Hierarchy', icon: TreePine,        roles: ['HR', 'SUPERVISOR'] },
     { path: '/workforce', label: 'Workforce',  icon: Users,           roles: ['HR', 'SUPERVISOR', 'CONTRACTOR'] },
     { path: '/attendance',label: 'Attendance', icon: ClipboardList,   roles: ['HR', 'SUPERVISOR', 'CONTRACTOR', 'LABOURER'] },
     { path: '/payroll',   label: 'Payroll',    icon: DollarSign,      roles: ['HR', 'SUPERVISOR', 'CONTRACTOR', 'LABOURER'] },

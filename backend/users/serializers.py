@@ -3,6 +3,7 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.hashers import make_password, check_password
 from django.core import signing
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser
@@ -27,7 +28,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         model  = CustomUser
         fields = [
             'username', 'email', 'password', 'password2', 'role',
-            'first_name', 'last_name', 'phone', 'company_name'
+            'first_name', 'last_name', 'phone', 'company_name',
         ]
 
     def validate(self, data):
@@ -50,12 +51,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 # ── Two-step Login ────────────────────────────────────────────────
 
 class LoginSerializer(serializers.Serializer):
-    """
-    Step 1 of two-step login.
-    Validates username + password; returns a short-lived pre_auth_token
-    instead of the full JWT. The client must then POST to /auth/verify-pin/
-    to complete authentication.
-    """
+    """Step 1: validate credentials → pre_auth_token."""
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
 
@@ -68,7 +64,6 @@ class LoginSerializer(serializers.Serializer):
         if user.role == 'LABOURER':
             raise serializers.ValidationError('Labourers do not have system access.')
 
-        # Sign a short-lived token (5 minutes) — no JWT issued yet
         pre_auth_token = signing.dumps(
             {'user_id': user.id},
             salt='pre_auth_login',
@@ -81,24 +76,18 @@ class LoginSerializer(serializers.Serializer):
 
 
 class VerifyPINSerializer(serializers.Serializer):
-    """
-    Step 2 of two-step login.
-    - If pin_is_set: supply `pin`.
-    - If NOT pin_is_set (first login): supply `new_pin` + `confirm_pin`.
-    On success returns {user, access, refresh}.
-    """
+    """Step 2: verify or set PIN → full JWT."""
     pre_auth_token = serializers.CharField()
     pin            = serializers.CharField(required=False, allow_blank=True)
     new_pin        = serializers.CharField(required=False, allow_blank=True)
     confirm_pin    = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, data):
-        # --- decode token ---
         try:
             payload = signing.loads(
                 data['pre_auth_token'],
                 salt='pre_auth_login',
-                max_age=300,   # 5 minutes
+                max_age=300,
             )
         except signing.SignatureExpired:
             raise serializers.ValidationError('Session expired. Please log in again.')
@@ -111,14 +100,12 @@ class VerifyPINSerializer(serializers.Serializer):
             raise serializers.ValidationError('User not found.')
 
         if user.pin_is_set:
-            # --- verify existing PIN ---
             pin = data.get('pin', '').strip()
             if not pin:
                 raise serializers.ValidationError({'pin': 'PIN is required.'})
             if not check_password(pin, user.security_pin):
                 raise serializers.ValidationError({'pin': 'Incorrect PIN.'})
         else:
-            # --- set PIN for the first time ---
             new_pin     = data.get('new_pin', '').strip()
             confirm_pin = data.get('confirm_pin', '').strip()
             if not new_pin:
@@ -131,7 +118,6 @@ class VerifyPINSerializer(serializers.Serializer):
             user.pin_is_set   = True
             user.save(update_fields=['security_pin', 'pin_is_set'])
 
-        # --- issue JWT ---
         refresh = RefreshToken.for_user(user)
         return {
             'user':    UserSerializer(user).data,
@@ -140,16 +126,59 @@ class VerifyPINSerializer(serializers.Serializer):
         }
 
 
-# ── PIN management ────────────────────────────────────────────────
+# ── Forgot PIN ────────────────────────────────────────────────────
 
-class SetPINSerializer(serializers.Serializer):
-    """Authenticated user changing their own PIN."""
-    current_pin = serializers.CharField(required=False, allow_blank=True)
+class ForgotPINSerializer(serializers.Serializer):
+    """
+    POST /auth/forgot-pin/ with {username}.
+    Generates a 6-digit reset code (plain stored on model for HR to relay),
+    hashed for verification, expires in 15 minutes.
+    """
+    username = serializers.CharField()
+
+    def validate_username(self, value):
+        try:
+            user = CustomUser.objects.get(username=value)
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError(
+                'No account found with that username.'
+            )
+        if not user.pin_is_set:
+            raise serializers.ValidationError(
+                'No PIN has been set for this account. Contact HR.'
+            )
+        return value
+
+
+class ResetPINWithCodeSerializer(serializers.Serializer):
+    """
+    POST /auth/reset-pin-with-code/
+    {username, reset_code, new_pin, confirm_pin}
+    """
+    username    = serializers.CharField()
+    reset_code  = serializers.CharField()
     new_pin     = serializers.CharField()
     confirm_pin = serializers.CharField()
 
     def validate(self, data):
-        user = self.context['request'].user
+        try:
+            user = CustomUser.objects.get(username=data['username'])
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError({'username': 'User not found.'})
+
+        if not user.pin_reset_code:
+            raise serializers.ValidationError({'reset_code': 'No reset was requested for this account.'})
+
+        if user.pin_reset_expires and user.pin_reset_expires < timezone.now():
+            # Clear expired code
+            user.pin_reset_code    = ''
+            user.pin_reset_expires = None
+            user.save(update_fields=['pin_reset_code', 'pin_reset_expires'])
+            raise serializers.ValidationError({'reset_code': 'Reset code has expired. Please request a new one.'})
+
+        if not check_password(data['reset_code'], user.pin_reset_code):
+            raise serializers.ValidationError({'reset_code': 'Incorrect reset code.'})
+
         new_pin     = data.get('new_pin', '').strip()
         confirm_pin = data.get('confirm_pin', '').strip()
 
@@ -158,27 +187,45 @@ class SetPINSerializer(serializers.Serializer):
         if new_pin != confirm_pin:
             raise serializers.ValidationError({'confirm_pin': 'PINs do not match.'})
 
+        data['_user'] = user
+        return data
+
+
+# ── PIN management ────────────────────────────────────────────────
+
+class SetPINSerializer(serializers.Serializer):
+    current_pin = serializers.CharField(required=False, allow_blank=True)
+    new_pin     = serializers.CharField()
+    confirm_pin = serializers.CharField()
+
+    def validate(self, data):
+        user    = self.context['request'].user
+        new_pin = data.get('new_pin', '').strip()
+        confirm = data.get('confirm_pin', '').strip()
+
+        if len(new_pin) != 4 or not new_pin.isdigit():
+            raise serializers.ValidationError({'new_pin': 'PIN must be exactly 4 digits.'})
+        if new_pin != confirm:
+            raise serializers.ValidationError({'confirm_pin': 'PINs do not match.'})
         if user.pin_is_set:
             current = data.get('current_pin', '').strip()
             if not current:
                 raise serializers.ValidationError({'current_pin': 'Current PIN is required.'})
             if not check_password(current, user.security_pin):
                 raise serializers.ValidationError({'current_pin': 'Current PIN is incorrect.'})
-
         return data
 
 
 class AdminResetPINSerializer(serializers.Serializer):
-    """HR force-resetting any user's PIN."""
     new_pin     = serializers.CharField()
     confirm_pin = serializers.CharField()
 
     def validate(self, data):
-        new_pin     = data.get('new_pin', '').strip()
-        confirm_pin = data.get('confirm_pin', '').strip()
+        new_pin = data.get('new_pin', '').strip()
+        confirm = data.get('confirm_pin', '').strip()
         if len(new_pin) != 4 or not new_pin.isdigit():
             raise serializers.ValidationError({'new_pin': 'PIN must be exactly 4 digits.'})
-        if new_pin != confirm_pin:
+        if new_pin != confirm:
             raise serializers.ValidationError({'confirm_pin': 'PINs do not match.'})
         return data
 
@@ -198,7 +245,8 @@ class ChangePasswordSerializer(serializers.Serializer):
 class AdminPasswordListSerializer(serializers.ModelSerializer):
     class Meta:
         model  = CustomUser
-        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role', 'plain_password', 'pin_is_set']
+        fields = ['id', 'username', 'first_name', 'last_name', 'email',
+                  'role', 'plain_password', 'pin_is_set']
         read_only_fields = fields
 
 

@@ -8,6 +8,8 @@ import WorkforcePage from './pages/WorkforcePage';
 import AttendancePage from './pages/AttendancePage';
 import PayrollPage from './pages/PayrollPage';
 import UsersPage from './pages/UsersPage';
+import HierarchyPage from './pages/HierarchyPage';
+
 // Protected route wrapper
 const ProtectedRoute = ({ children, roles }: { children: React.ReactNode; roles?: string[] }) => {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -82,6 +84,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <PayrollPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/hierarchy"
+        element={
+          <ProtectedRoute>
+          <HierarchyPage />
           </ProtectedRoute>
         }
       />
