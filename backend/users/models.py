@@ -1,4 +1,4 @@
-# users/models.py — REPLACE ENTIRE FILE
+# backend/users/models.py — REPLACE ENTIRE FILE
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -23,6 +23,13 @@ class CustomUser(AbstractUser):
     # HR can view / reset plain-text passwords
     plain_password = models.CharField(max_length=128, blank=True, default='')
 
+    # Monthly salary — set when a Supervisor account is created
+    # Used by the auto payroll generator on the 5th of each month
+    monthly_salary = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="Monthly salary for Supervisors (auto-payroll generated on the 5th)"
+    )
+
     # Two-step PIN authentication
     security_pin = models.CharField(
         max_length=128, blank=True, default='',
@@ -30,8 +37,9 @@ class CustomUser(AbstractUser):
     )
     pin_is_set = models.BooleanField(default=False)
 
-    # Forgot-PIN one-time reset code (hashed, expires in 15 min)
+    # Forgot-PIN one-time reset code
     pin_reset_code    = models.CharField(max_length=128, blank=True, default='')
+    pin_reset_plain   = models.CharField(max_length=10,  blank=True, default='')  # HR-readable
     pin_reset_expires = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

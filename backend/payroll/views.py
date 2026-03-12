@@ -1,38 +1,43 @@
-# payroll/views.py — REPLACE ENTIRE FILE
+# backend/payroll/views.py — REPLACE ENTIRE FILE
 
+from django.utils import timezone
+from django.db.models import Sum
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Sum, Q
-from .models import SupervisorPayroll, ContractorPayroll, LabourerPayroll
+
+from .models import SupervisorPayroll, ContractorProjectPayroll, DailyLabourerPayroll
 from .serializers import (
-    SupervisorPayrollSerializer, ContractorPayrollSerializer, LabourerPayrollSerializer
+    SupervisorPayrollSerializer,
+    ContractorProjectPayrollSerializer,
+    DailyLabourerPayrollSerializer,
 )
-from attendance.models import Project
-from workforce.models import Contractor, Labourer
-from users.models import CustomUser
+from workforce.models import Contractor
 
 
-# ── SUPERVISOR PAYROLL ──────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────
+# SUPERVISOR PAYROLL
+# ─────────────────────────────────────────────────────────────────────
+
 class SupervisorPayrollListCreateView(generics.ListCreateAPIView):
     serializer_class   = SupervisorPayrollSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        qs   = SupervisorPayroll.objects.select_related('supervisor', 'project')
+        qs   = SupervisorPayroll.objects.select_related('supervisor', 'approved_by')
+
         if user.role == 'SUPERVISOR':
             qs = qs.filter(supervisor=user)
         elif user.role != 'HR':
             return qs.none()
-        project_id = self.request.query_params.get('project')
-        if project_id:
-            qs = qs.filter(project_id=project_id)
-        return qs
 
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        month    = self.request.query_params.get('month')
+        status_f = self.request.query_params.get('status')
+        if month:    qs = qs.filter(month__startswith=month)
+        if status_f: qs = qs.filter(status=status_f)
+        return qs
 
 
 class SupervisorPayrollDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -40,143 +45,201 @@ class SupervisorPayrollDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
     queryset           = SupervisorPayroll.objects.all()
 
+    def partial_update(self, request, *args, **kwargs):
+        instance   = self.get_object()
+        new_status = request.data.get('status')
+        if new_status in ('APPROVED', 'PAID') and not instance.approved_by:
+            instance.approved_by = request.user
+            instance.approved_at = timezone.now()
+            instance.save(update_fields=['approved_by', 'approved_at'])
+        return super().partial_update(request, *args, **kwargs)
 
-# ── CONTRACTOR PAYROLL ──────────────────────────────────────────
-class ContractorPayrollListCreateView(generics.ListCreateAPIView):
-    serializer_class   = ContractorPayrollSerializer
+
+# ─────────────────────────────────────────────────────────────────────
+# CONTRACTOR PROJECT PAYROLL
+# Supervisor approves to release payment.
+# ─────────────────────────────────────────────────────────────────────
+
+class ContractorProjectPayrollListView(generics.ListAPIView):
+    serializer_class   = ContractorProjectPayrollSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        # 'period' IS a valid FK on ContractorPayroll
-        qs   = ContractorPayroll.objects.select_related('contractor__user', 'project', 'period')
-        if user.role == 'CONTRACTOR':
-            cp = Contractor.objects.filter(user=user).first()
-            if cp:
-                qs = qs.filter(contractor=cp)
-            else:
-                return qs.none()
-        elif user.role == 'SUPERVISOR':
-            qs = qs.filter(project__supervisor=user)
-        elif user.role != 'HR':
-            return qs.none()
-
-        project_id = self.request.query_params.get('project')
-        period_id  = self.request.query_params.get('period')
-        if project_id: qs = qs.filter(project_id=project_id)
-        if period_id:  qs = qs.filter(period_id=period_id)
-        return qs
-
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
-
-
-class ContractorPayrollDetailView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class   = ContractorPayrollSerializer
-    permission_classes = [IsAuthenticated]
-    queryset           = ContractorPayroll.objects.all()
-
-
-# ── LABOURER PAYROLL ────────────────────────────────────────────
-class LabourerPayrollListCreateView(generics.ListCreateAPIView):
-    serializer_class   = LabourerPayrollSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        user = self.request.user
-        # FIX: LabourerPayroll has NO 'period' FK field — removed from select_related.
-        # It uses start_date / end_date date fields instead of a Period relation.
-        qs   = LabourerPayroll.objects.select_related(
-            'labourer__user', 'temp_labourer', 'project'
+        qs   = ContractorProjectPayroll.objects.select_related(
+            'contractor__user', 'contractor__supervisor',
+            'project', 'assignment', 'approved_by'
         )
+
         if user.role == 'CONTRACTOR':
             cp = Contractor.objects.filter(user=user).first()
-            if cp:
-                qs = qs.filter(
-                    Q(labourer__contractor=cp) | Q(temp_labourer__contractor=cp)
-                )
-            else:
-                return qs.none()
+            qs = qs.filter(contractor=cp) if cp else qs.none()
+
         elif user.role == 'SUPERVISOR':
-            qs = qs.filter(project__supervisor=user)
+            qs = qs.filter(contractor__supervisor=user)
+
+        elif user.role != 'HR':
+            return qs.none()
+
+        project_id  = self.request.query_params.get('project')
+        contractor  = self.request.query_params.get('contractor')
+        status_f    = self.request.query_params.get('status')
+
+        if project_id: qs = qs.filter(project_id=project_id)
+        if contractor: qs = qs.filter(contractor_id=contractor)
+        if status_f:   qs = qs.filter(status=status_f)
+        return qs.order_by('-created_at')
+
+
+class ContractorProjectPayrollDetailView(generics.RetrieveUpdateAPIView):
+    """
+    PATCH {status: "PAID"} → Supervisor or HR approves the payout.
+    Also accepts advance_paid, deductions, notes adjustments before paying.
+    """
+    serializer_class   = ContractorProjectPayrollSerializer
+    permission_classes = [IsAuthenticated]
+    queryset           = ContractorProjectPayroll.objects.all()
+
+    def partial_update(self, request, *args, **kwargs):
+        instance   = self.get_object()
+        new_status = request.data.get('status')
+        if new_status == 'PAID' and not instance.approved_by:
+            instance.approved_by = request.user
+            instance.approved_at = timezone.now()
+            instance.save(update_fields=['approved_by', 'approved_at'])
+        return super().partial_update(request, *args, **kwargs)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# DAILY LABOURER PAYROLL — read-only
+# ─────────────────────────────────────────────────────────────────────
+
+class DailyLabourerPayrollListView(generics.ListAPIView):
+    serializer_class   = DailyLabourerPayrollSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs   = DailyLabourerPayroll.objects.select_related(
+            'labourer__user', 'temp_labourer', 'contractor__user', 'project', 'attendance'
+        )
+
+        if user.role == 'CONTRACTOR':
+            cp = Contractor.objects.filter(user=user).first()
+            qs = qs.filter(contractor=cp) if cp else qs.none()
+
+        elif user.role == 'SUPERVISOR':
+            my_contractors = Contractor.objects.filter(supervisor=user)
+            qs = qs.filter(contractor__in=my_contractors)
+
         elif user.role != 'HR':
             return qs.none()
 
         project_id = self.request.query_params.get('project')
+        date       = self.request.query_params.get('date')
+        contractor = self.request.query_params.get('contractor')
+        month      = self.request.query_params.get('month')
+        is_temp    = self.request.query_params.get('is_temp')
+
         if project_id: qs = qs.filter(project_id=project_id)
-        return qs
+        if date:       qs = qs.filter(date=date)
+        if contractor: qs = qs.filter(contractor_id=contractor)
+        if month:      qs = qs.filter(date__startswith=month)
+        if is_temp is not None:
+            qs = qs.filter(is_temp=is_temp.lower() == 'true')
 
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        return qs.order_by('-date')
 
 
-class LabourerPayrollDetailView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class   = LabourerPayrollSerializer
+class DailyLabourerPayrollDetailView(generics.RetrieveAPIView):
+    serializer_class   = DailyLabourerPayrollSerializer
     permission_classes = [IsAuthenticated]
-    queryset           = LabourerPayroll.objects.all()
+    queryset           = DailyLabourerPayroll.objects.all()
 
 
-class LabourerPayrollAutoCalculateView(APIView):
-    permission_classes = [IsAuthenticated]
+# ─────────────────────────────────────────────────────────────────────
+# PAYROLL DASHBOARD — role-aware summary stats
+# ─────────────────────────────────────────────────────────────────────
 
-    def post(self, request, pk):
-        try:
-            payroll = LabourerPayroll.objects.get(pk=pk)
-        except LabourerPayroll.DoesNotExist:
-            return Response({'error': 'Not found.'}, status=404)
-        payroll.auto_calculate()
-        return Response(LabourerPayrollSerializer(payroll).data)
-
-
-# ── HR DASHBOARD ────────────────────────────────────────────────
 class PayrollDashboardView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = self.request.user
+        user = request.user
         data = {}
+        today = timezone.now().date()
+        this_month = today.strftime('%Y-%m')
 
         if user.role == 'HR':
-            data['supervisor_payrolls'] = {
-                'total':        SupervisorPayroll.objects.count(),
+            data['supervisor'] = {
                 'pending':      SupervisorPayroll.objects.filter(status='PENDING').count(),
                 'approved':     SupervisorPayroll.objects.filter(status='APPROVED').count(),
                 'paid':         SupervisorPayroll.objects.filter(status='PAID').count(),
-                'total_amount': SupervisorPayroll.objects.aggregate(t=Sum('total_amount'))['t'] or 0,
+                'total_amount': float(SupervisorPayroll.objects.aggregate(t=Sum('total_amount'))['t'] or 0),
             }
-            data['contractor_payrolls'] = {
-                'total':        ContractorPayroll.objects.count(),
-                'pending':      ContractorPayroll.objects.filter(status='PENDING').count(),
-                'approved':     ContractorPayroll.objects.filter(status='APPROVED').count(),
-                'paid':         ContractorPayroll.objects.filter(status='PAID').count(),
-                'total_amount': ContractorPayroll.objects.aggregate(t=Sum('total_amount'))['t'] or 0,
+            data['contractor'] = {
+                'pending': ContractorProjectPayroll.objects.filter(status='PENDING').count(),
+                'paid':    ContractorProjectPayroll.objects.filter(status='PAID').count(),
+                'total_paid': float(
+                    ContractorProjectPayroll.objects.filter(status='PAID')
+                    .aggregate(t=Sum('total_amount'))['t'] or 0
+                ),
             }
-            data['labourer_payrolls'] = {
-                'total':        LabourerPayroll.objects.count(),
-                'pending':      LabourerPayroll.objects.filter(status='PENDING').count(),
-                'approved':     LabourerPayroll.objects.filter(status='APPROVED').count(),
-                'paid':         LabourerPayroll.objects.filter(status='PAID').count(),
-                'total_amount': LabourerPayroll.objects.aggregate(t=Sum('total_amount'))['t'] or 0,
+            data['labourer'] = {
+                'total_records': DailyLabourerPayroll.objects.count(),
+                'total_paid': float(
+                    DailyLabourerPayroll.objects.filter(status='PAID')
+                    .aggregate(t=Sum('total_amount'))['t'] or 0
+                ),
+                'today': float(
+                    DailyLabourerPayroll.objects.filter(date=today)
+                    .aggregate(t=Sum('total_amount'))['t'] or 0
+                ),
             }
-            data['active_projects'] = Project.objects.filter(status='ACTIVE').count()
 
         elif user.role == 'SUPERVISOR':
-            my_payrolls = SupervisorPayroll.objects.filter(supervisor=user)
-            data['my_payrolls'] = {
-                'total':        my_payrolls.count(),
-                'total_earned': my_payrolls.aggregate(t=Sum('total_amount'))['t'] or 0,
-                'pending':      my_payrolls.filter(status='PENDING').count(),
+            mine = SupervisorPayroll.objects.filter(supervisor=user)
+            data['my_salary'] = {
+                'pending':      mine.filter(status='PENDING').count(),
+                'approved':     mine.filter(status='APPROVED').count(),
+                'paid':         mine.filter(status='PAID').count(),
+                'total_earned': float(mine.filter(status='PAID').aggregate(t=Sum('total_amount'))['t'] or 0),
+                'next_pending': float(mine.filter(status='PENDING').aggregate(t=Sum('total_amount'))['t'] or 0),
             }
-            data['projects'] = Project.objects.filter(supervisor=user).count()
+            my_contractors = Contractor.objects.filter(supervisor=user)
+            con_payrolls   = ContractorProjectPayroll.objects.filter(contractor__in=my_contractors)
+            data['contractor_payouts'] = {
+                'pending': con_payrolls.filter(status='PENDING').count(),
+                'paid':    con_payrolls.filter(status='PAID').count(),
+            }
+            data['labourer_today'] = float(
+                DailyLabourerPayroll.objects.filter(
+                    contractor__in=my_contractors, date=today
+                ).aggregate(t=Sum('total_amount'))['t'] or 0
+            )
 
         elif user.role == 'CONTRACTOR':
             cp = Contractor.objects.filter(user=user).first()
             if cp:
-                my_payrolls = ContractorPayroll.objects.filter(contractor=cp)
-                data['my_payrolls'] = {
-                    'total':        my_payrolls.count(),
-                    'total_earned': my_payrolls.aggregate(t=Sum('total_amount'))['t'] or 0,
-                    'pending':      my_payrolls.filter(status='PENDING').count(),
+                my_payrolls = ContractorProjectPayroll.objects.filter(contractor=cp)
+                data['my_projects'] = {
+                    'pending': my_payrolls.filter(status='PENDING').count(),
+                    'paid':    my_payrolls.filter(status='PAID').count(),
+                    'total_earned': float(
+                        my_payrolls.filter(status='PAID').aggregate(t=Sum('total_amount'))['t'] or 0
+                    ),
+                    'pending_amount': float(
+                        my_payrolls.filter(status='PENDING').aggregate(t=Sum('total_amount'))['t'] or 0
+                    ),
                 }
+                data['labourer_today'] = float(
+                    DailyLabourerPayroll.objects.filter(contractor=cp, date=today)
+                    .aggregate(t=Sum('total_amount'))['t'] or 0
+                )
+                data['labourer_month'] = float(
+                    DailyLabourerPayroll.objects.filter(
+                        contractor=cp, date__startswith=this_month
+                    ).aggregate(t=Sum('total_amount'))['t'] or 0
+                )
 
         return Response(data)

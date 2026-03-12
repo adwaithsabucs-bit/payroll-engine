@@ -1,20 +1,23 @@
-# attendance/serializers.py — REPLACE ENTIRE FILE
+# backend/attendance/serializers.py — REPLACE ENTIRE FILE
 
 from rest_framework import serializers
-from .models import Project, Period, TemporaryLabourer, ContractorAttendance, LabourerAttendance
-from users.models import CustomUser
+from .models import (
+    Project, Period, TemporaryLabourer,
+    ContractorAttendance, LabourerAttendance,
+    ProjectContractorAssignment,
+)
 
 
 class ProjectSerializer(serializers.ModelSerializer):
     supervisor_name = serializers.SerializerMethodField()
 
     class Meta:
-        model = Project
+        model  = Project
         fields = '__all__'
 
     def get_supervisor_name(self, obj):
         if obj.supervisor:
-            return f"{obj.supervisor.first_name} {obj.supervisor.last_name or obj.supervisor.username}".strip()
+            return obj.supervisor.get_full_name() or obj.supervisor.username
         return None
 
 
@@ -22,74 +25,75 @@ class PeriodSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source='project.name', read_only=True)
 
     class Meta:
-        model = Period
+        model  = Period
         fields = '__all__'
 
 
 class TemporaryLabourerSerializer(serializers.ModelSerializer):
     class Meta:
-        model = TemporaryLabourer
+        model  = TemporaryLabourer
         fields = '__all__'
 
 
 class ContractorAttendanceSerializer(serializers.ModelSerializer):
     contractor_name = serializers.SerializerMethodField()
-    project_name    = serializers.CharField(source='project.name', read_only=True)
 
     class Meta:
-        model = ContractorAttendance
+        model  = ContractorAttendance
         fields = '__all__'
-        read_only_fields = ['marked_by', 'created_at', 'updated_at']
 
     def get_contractor_name(self, obj):
         u = obj.contractor.user
-        return f"{u.first_name} {u.last_name or u.username}".strip()
-
-    def create(self, validated_data):
-        validated_data['marked_by'] = self.context['request'].user
-        return super().create(validated_data)
-
-    def update(self, instance, validated_data):
-        validated_data['marked_by'] = self.context['request'].user
-        return super().update(instance, validated_data)
+        return u.get_full_name() or u.username
 
 
 class LabourerAttendanceSerializer(serializers.ModelSerializer):
     labourer_name = serializers.SerializerMethodField()
-    is_temp       = serializers.SerializerMethodField()
-    project_name  = serializers.CharField(source='project.name', read_only=True)
 
     class Meta:
-        model = LabourerAttendance
+        model  = LabourerAttendance
         fields = '__all__'
-        read_only_fields = ['marked_by', 'created_at', 'updated_at']
 
     def get_labourer_name(self, obj):
         if obj.labourer:
-            u = obj.labourer.user
-            return f"{u.first_name} {u.last_name or u.username}".strip()
+            return obj.labourer.user.get_full_name() or obj.labourer.user.username
         if obj.temp_labourer:
             return f"{obj.temp_labourer.name} (Temp)"
         return "Unknown"
 
-    def get_is_temp(self, obj):
-        return obj.temp_labourer_id is not None
 
-    def create(self, validated_data):
-        validated_data['marked_by'] = self.context['request'].user
-        return super().create(validated_data)
+class ProjectContractorAssignmentSerializer(serializers.ModelSerializer):
+    contractor_name  = serializers.SerializerMethodField()
+    contractor_company = serializers.SerializerMethodField()
+    project_name     = serializers.CharField(source='project.name', read_only=True)
+    assigned_by_name = serializers.SerializerMethodField()
+    payroll_status   = serializers.SerializerMethodField()
+    payroll_id       = serializers.SerializerMethodField()
 
-    def update(self, instance, validated_data):
-        validated_data['marked_by'] = self.context['request'].user
-        return super().update(instance, validated_data)
+    class Meta:
+        model  = ProjectContractorAssignment
+        fields = '__all__'
 
+    def get_contractor_name(self, obj):
+        u = obj.contractor.user
+        return u.get_full_name() or u.username
 
-class AttendanceSummarySerializer(serializers.Serializer):
-    """Used by HR admin for monitoring dashboard."""
-    supervisor_id   = serializers.IntegerField()
-    supervisor_name = serializers.CharField()
-    project_name    = serializers.CharField()
-    contractors_total    = serializers.IntegerField()
-    contractors_marked   = serializers.IntegerField()
-    labourers_total      = serializers.IntegerField()
-    labourers_marked     = serializers.IntegerField()
+    def get_contractor_company(self, obj):
+        return obj.contractor.company_name or ''
+
+    def get_assigned_by_name(self, obj):
+        if obj.assigned_by:
+            return obj.assigned_by.get_full_name() or obj.assigned_by.username
+        return None
+
+    def get_payroll_status(self, obj):
+        try:
+            return obj.payroll.status
+        except Exception:
+            return None
+
+    def get_payroll_id(self, obj):
+        try:
+            return obj.payroll.id
+        except Exception:
+            return None

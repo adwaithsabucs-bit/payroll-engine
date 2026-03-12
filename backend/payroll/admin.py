@@ -1,6 +1,6 @@
 from django.contrib import admin
-from .models import SupervisorPayroll, ContractorPayroll, LabourerPayroll
+from .models import SupervisorPayroll, ContractorProjectPayroll, DailyLabourerPayroll
 
 admin.site.register(SupervisorPayroll)
-admin.site.register(ContractorPayroll)
-admin.site.register(LabourerPayroll)
+admin.site.register(ContractorProjectPayroll)
+admin.site.register(DailyLabourerPayroll)
