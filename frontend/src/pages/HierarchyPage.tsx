@@ -90,22 +90,22 @@ const LabourerCard = ({
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 600, color: 'white', fontSize: 13 }}>{name}</span>
-          <span style={{ fontSize: 10, color: '#52525b', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 1 }}>@{lab.username}</span>
+          <span style={{ fontSize: 12, color: '#a1a1aa', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 1 }}>@{lab.username}</span>
           {lab.skill && (
-            <span style={{ fontSize: 9, color, background: `${color}12`, padding: '2px 7px', borderRadius: 8, fontWeight: 700, letterSpacing: 1 }}>
+            <span style={{ fontSize: 13, color, background: `${color}12`, padding: '2px 7px', borderRadius: 8, fontWeight: 700, letterSpacing: 1 }}>
               {lab.skill}
             </span>
           )}
           {!lab.is_active && (
-            <span style={{ fontSize: 9, color: '#f87171', background: 'rgba(248,113,113,0.1)', padding: '2px 7px', borderRadius: 8, fontWeight: 700 }}>INACTIVE</span>
+            <span style={{ fontSize: 13, color: '#f87171', background: 'rgba(248,113,113,0.1)', padding: '2px 7px', borderRadius: 8, fontWeight: 700 }}>INACTIVE</span>
           )}
         </div>
         <div style={{ display: 'flex', gap: 14, marginTop: 4, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, color: '#71717a' }}>{lab.email}</span>
-          {lab.phone && <span style={{ fontSize: 11, color: '#52525b' }}>{lab.phone}</span>}
-          <span style={{ fontSize: 11, color: color, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>₹{lab.daily_wage}/day</span>
+          <span style={{ fontSize: 13, color: '#71717a' }}>{lab.email}</span>
+          {lab.phone && <span style={{ fontSize: 13, color: '#a1a1aa' }}>{lab.phone}</span>}
+          <span style={{ fontSize: 13, color: color, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>₹{lab.daily_wage}/day</span>
           {parseFloat(lab.overtime_rate) > 0 && (
-            <span style={{ fontSize: 11, color: '#71717a' }}>OT ₹{lab.overtime_rate}/hr</span>
+            <span style={{ fontSize: 13, color: '#71717a' }}>OT ₹{lab.overtime_rate}/hr</span>
           )}
         </div>
       </div>
@@ -163,15 +163,15 @@ const ContractorBranch = ({
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontWeight: 700, color: 'white', fontSize: 14 }}>{name}</span>
-              <span style={{ fontSize: 10, color: '#52525b', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 1 }}>@{con.username}</span>
+              <span style={{ fontSize: 12, color: '#a1a1aa', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 1 }}>@{con.username}</span>
               {con.company_name && (
-                <span style={{ fontSize: 11, color: '#a1a1aa' }}>{con.company_name}</span>
+                <span style={{ fontSize: 13, color: '#a1a1aa' }}>{con.company_name}</span>
               )}
               {!con.is_active && (
-                <span style={{ fontSize: 9, color: '#f87171', background: 'rgba(248,113,113,0.1)', padding: '2px 7px', borderRadius: 8, fontWeight: 700 }}>INACTIVE</span>
+                <span style={{ fontSize: 13, color: '#f87171', background: 'rgba(248,113,113,0.1)', padding: '2px 7px', borderRadius: 8, fontWeight: 700 }}>INACTIVE</span>
               )}
             </div>
-            <div style={{ fontSize: 11, color: '#71717a', marginTop: 2 }}>{con.email}</div>
+            <div style={{ fontSize: 13, color: '#71717a', marginTop: 2 }}>{con.email}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
             <div style={{
@@ -179,7 +179,7 @@ const ContractorBranch = ({
               background: `${color}12`, padding: '4px 10px', borderRadius: 10,
             }}>
               <HardHat size={11} color={color} />
-              <span style={{ fontSize: 11, fontWeight: 700, color, fontFamily: "'Barlow Condensed', sans-serif" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color, fontFamily: "'Barlow Condensed', sans-serif" }}>
                 {con.labourers.length}
               </span>
             </div>
@@ -194,7 +194,7 @@ const ContractorBranch = ({
       {open && (
         <div style={{ marginTop: 6, paddingLeft: 12, borderLeft: `1px dashed ${color}25` }}>
           {visibleLabs.length === 0 ? (
-            <div style={{ padding: '8px 14px', fontSize: 12, color: '#3f3f46', fontStyle: 'italic' }}>
+            <div style={{ padding: '8px 14px', fontSize: 12, color: '#71717a', fontStyle: 'italic' }}>
               No labourers assigned yet
             </div>
           ) : (
@@ -255,20 +255,20 @@ const SupervisorBranch = ({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 700, color: 'white', fontSize: 15 }}>{name}</span>
-            <span style={{ fontSize: 10, color: '#52525b', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 1 }}>@{sv.username}</span>
+            <span style={{ fontSize: 12, color: '#a1a1aa', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 1 }}>@{sv.username}</span>
           </div>
-          <div style={{ fontSize: 11, color: '#71717a', marginTop: 2 }}>{sv.email}</div>
+          <div style={{ fontSize: 13, color: '#71717a', marginTop: 2 }}>{sv.email}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: `${color}12`, padding: '4px 10px', borderRadius: 10 }}>
             <Briefcase size={11} color={color} />
-            <span style={{ fontSize: 11, fontWeight: 700, color, fontFamily: "'Barlow Condensed', sans-serif" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color, fontFamily: "'Barlow Condensed', sans-serif" }}>
               {sv.contractors.length} contractors
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(74,222,128,0.1)', padding: '4px 10px', borderRadius: 10 }}>
             <HardHat size={11} color="#4ade80" />
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#4ade80', fontFamily: "'Barlow Condensed', sans-serif" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#4ade80', fontFamily: "'Barlow Condensed', sans-serif" }}>
               {totalLabourers} labourers
             </span>
           </div>
@@ -281,7 +281,7 @@ const SupervisorBranch = ({
       {open && (
         <div style={{ marginTop: 8, paddingLeft: 16, borderLeft: `1px dashed ${color}30` }}>
           {visibleContractors.length === 0 ? (
-            <div style={{ padding: '10px 14px', fontSize: 12, color: '#3f3f46', fontStyle: 'italic' }}>
+            <div style={{ padding: '10px 14px', fontSize: 12, color: '#71717a', fontStyle: 'italic' }}>
               No contractors assigned yet
             </div>
           ) : (
@@ -320,10 +320,10 @@ const UnassignedSection = ({
         <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: '#ef4444' }}>
           {title}
         </span>
-        <span style={{ fontSize: 11, color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
+        <span style={{ fontSize: 13, color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
           {count}
         </span>
-        <span style={{ fontSize: 11, color: '#52525b', marginLeft: 4 }}>not yet assigned</span>
+        <span style={{ fontSize: 13, color: '#a1a1aa', marginLeft: 4 }}>not yet assigned</span>
         <div style={{ marginLeft: 'auto' }}>
           {open ? <ChevronDown size={13} color="#71717a" /> : <ChevronRight size={13} color="#71717a" />}
         </div>
@@ -490,16 +490,16 @@ export default function HierarchyPage() {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 28, paddingBottom: 20, borderBottom: '1px solid #161616', position: 'relative' }}>
           <div style={{ position: 'absolute', bottom: -1, left: 0, width: 64, height: 3, background: '#dc2626', borderRadius: 2 }} />
           <div>
-            <div style={{ fontSize: 10, letterSpacing: 4, textTransform: 'uppercase', color: '#71717a', marginBottom: 6, fontWeight: 600 }}>Organisation</div>
+            <div style={{ fontSize: 12, letterSpacing: 2, textTransform: 'uppercase', color: '#71717a', marginBottom: 6, fontWeight: 600 }}>Organisation</div>
             <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 44, fontWeight: 900, color: 'white', textTransform: 'uppercase', letterSpacing: -1, lineHeight: 1 }}>
               Hierarchy View
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={load} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', color: '#a1a1aa', border: '1px solid #1e1e1e', padding: '9px 16px', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', cursor: 'pointer', borderRadius: 6 }}>
+            <button onClick={load} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', color: '#d4d4d8', border: '1px solid #3f3f46', padding: '9px 16px', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', cursor: 'pointer', borderRadius: 6 }}>
               Refresh
             </button>
-            <button onClick={handleExpandToggle} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#141414', color: '#a1a1aa', border: '1px solid #1e1e1e', padding: '9px 16px', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', cursor: 'pointer', borderRadius: 6 }}>
+            <button onClick={handleExpandToggle} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#141414', color: '#d4d4d8', border: '1px solid #3f3f46', padding: '9px 16px', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', cursor: 'pointer', borderRadius: 6 }}>
               <TreePine size={12} />
               {expandAll ? 'Collapse All' : 'Expand All'}
             </button>
@@ -517,7 +517,7 @@ export default function HierarchyPage() {
             ].map(s => (
               <div key={s.label} style={{ background: '#0d0d0d', border: '1px solid #161616', padding: '18px 20px', position: 'relative', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: s.color }} />
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', color: '#71717a', marginBottom: 6 }}>{s.label}</div>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', color: '#71717a', marginBottom: 6 }}>{s.label}</div>
                 <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 40, fontWeight: 900, lineHeight: 1, color: s.color }}>{s.val}</div>
               </div>
             ))}
@@ -534,13 +534,13 @@ export default function HierarchyPage() {
                 stats.unassignedLabs > 0 && `${stats.unassignedLabs} labourer${stats.unassignedLabs > 1 ? 's' : ''} with no contractor`,
               ].filter(Boolean).join(' · ')}
             </span>
-            <span style={{ fontSize: 11, color: '#52525b', marginLeft: 4 }}>— shown below the main tree</span>
+            <span style={{ fontSize: 13, color: '#a1a1aa', marginLeft: 4 }}>— shown below the main tree</span>
           </div>
         )}
 
         {/* ── Search + filter ── */}
         <div style={{ position: 'relative', marginBottom: 24 }}>
-          <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#52525b', pointerEvents: 'none' }} />
+          <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#a1a1aa', pointerEvents: 'none' }} />
           <input
             className="hier-input"
             type="text"
@@ -555,21 +555,21 @@ export default function HierarchyPage() {
             }}
           />
           {search && (
-            <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#52525b', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+            <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
           )}
         </div>
 
         {/* ── Legend ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 24, padding: '10px 14px', background: '#0a0a0a', border: '1px solid #161616', borderRadius: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 9, letterSpacing: 3, textTransform: 'uppercase', color: '#3f3f46', fontWeight: 700 }}>Legend</span>
+          <span style={{ fontSize: 13, letterSpacing: 2, textTransform: 'uppercase', color: '#a1a1aa', fontWeight: 700 }}>Legend</span>
           {Object.entries(ROLE).map(([role, { color, Icon }]) => (
             <div key={role} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 3, height: 14, background: color, borderRadius: 2 }} />
               <Icon size={11} color={color} />
-              <span style={{ fontSize: 10, color, fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 2, fontWeight: 700 }}>{role}</span>
+              <span style={{ fontSize: 12, color, fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 2, fontWeight: 700 }}>{role}</span>
             </div>
           ))}
-          <div style={{ marginLeft: 'auto', fontSize: 11, color: '#3f3f46' }}>Click any row to expand / collapse</div>
+          <div style={{ marginLeft: 'auto', fontSize: 13, color: '#71717a' }}>Click any row to expand / collapse</div>
         </div>
 
         {/* ── HR Admins strip ── */}
@@ -577,7 +577,7 @@ export default function HierarchyPage() {
           <div style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <div style={{ width: 24, height: 2, background: '#a78bfa' }} />
-              <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', color: '#71717a' }}>HR Administration</span>
+              <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: '#71717a' }}>HR Administration</span>
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {hierarchy.hrUsers.map(hr => {
@@ -591,10 +591,10 @@ export default function HierarchyPage() {
                     </div>
                     <div>
                       <div style={{ fontWeight: 700, color: 'white', fontSize: 13 }}>{name}</div>
-                      <div style={{ fontSize: 11, color: '#71717a' }}>{hr.email}</div>
+                      <div style={{ fontSize: 13, color: '#71717a' }}>{hr.email}</div>
                     </div>
                     {hr.company_name && (
-                      <span style={{ fontSize: 10, color, background: `${color}12`, padding: '2px 8px', borderRadius: 8, fontWeight: 700, marginLeft: 'auto' }}>{hr.company_name}</span>
+                      <span style={{ fontSize: 12, color, background: `${color}12`, padding: '2px 8px', borderRadius: 8, fontWeight: 700, marginLeft: 'auto' }}>{hr.company_name}</span>
                     )}
                   </div>
                 );
@@ -606,11 +606,11 @@ export default function HierarchyPage() {
         {/* ── Section divider ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <div style={{ width: 24, height: 2, background: '#60a5fa' }} />
-          <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', color: '#71717a' }}>
+          <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: '#71717a' }}>
             Supervisors → Contractors → Labourers
           </span>
           {q && (
-            <span style={{ fontSize: 11, color: '#dc2626', marginLeft: 'auto' }}>
+            <span style={{ fontSize: 13, color: '#dc2626', marginLeft: 'auto' }}>
               Showing results for "{search}"
             </span>
           )}
@@ -620,7 +620,7 @@ export default function HierarchyPage() {
         {hierarchy && (
           <div key={key}>
             {hierarchy.supervisors.length === 0 && !q ? (
-              <div style={{ padding: 60, textAlign: 'center', color: '#3f3f46', border: '1px solid #1a1a1a', borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 4, textTransform: 'uppercase', fontSize: 13 }}>
+              <div style={{ padding: 60, textAlign: 'center', color: '#71717a', border: '1px solid #1a1a1a', borderRadius: 8, fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 4, textTransform: 'uppercase', fontSize: 13 }}>
                 No supervisors found
               </div>
             ) : (

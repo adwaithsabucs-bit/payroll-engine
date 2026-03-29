@@ -1,5 +1,3 @@
-// frontend/src/App.tsx — REPLACE ENTIRE FILE
-
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -9,6 +7,7 @@ import DashboardPage from './pages/DashboardPage';
 import WorkforcePage from './pages/WorkforcePage';
 import AttendancePage from './pages/AttendancePage';
 import PayrollPage from './pages/PayrollPage';
+import ProjectPage from './pages/ProjectPage';
 import UsersPage from './pages/UsersPage';
 import HierarchyPage from './pages/HierarchyPage';
 
@@ -46,6 +45,7 @@ const AppRoutes = () => {
       <Route path="/workforce" element={<ProtectedRoute roles={['HR', 'SUPERVISOR', 'CONTRACTOR']}><WorkforcePage /></ProtectedRoute>} />
       <Route path="/attendance" element={<ProtectedRoute><AttendancePage /></ProtectedRoute>} />
       <Route path="/payroll"   element={<ProtectedRoute><PayrollPage /></ProtectedRoute>} />
+      <Route path="/projects"  element={<ProtectedRoute roles={['HR', 'SUPERVISOR']}><ProjectPage /></ProtectedRoute>} />
       <Route path="/hierarchy" element={<ProtectedRoute roles={['HR', 'SUPERVISOR']}><HierarchyPage /></ProtectedRoute>} />
       <Route path="/"  element={<Navigate to="/login" replace />} />
       <Route path="*"  element={<Navigate to="/login" replace />} />

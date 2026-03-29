@@ -11,19 +11,19 @@ const S = {
   hdr:        { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 32, paddingBottom: 24, borderBottom: '1px solid #161616', position: 'relative' } as React.CSSProperties,
   hdrLine:    { position: 'absolute', bottom: -1, left: 0, width: 64, height: 3, background: '#dc2626' } as React.CSSProperties,
   title:      { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 48, fontWeight: 900, color: 'white', textTransform: 'uppercase', letterSpacing: -1, lineHeight: 1 } as React.CSSProperties,
-  sub:        { fontSize: 11, letterSpacing: 4, textTransform: 'uppercase', color: '#3f3f46', marginBottom: 8, fontWeight: 600 } as React.CSSProperties,
+  sub:        { fontSize: 13, letterSpacing: 2, textTransform: 'uppercase', color: '#a1a1aa', marginBottom: 8, fontWeight: 600 } as React.CSSProperties,
   statsRow:   { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 2, marginBottom: 24 } as React.CSSProperties,
   statBox:    { background: '#0d0d0d', border: '1px solid #161616', padding: '22px 24px', position: 'relative', overflow: 'hidden', transition: 'all 0.2s' } as React.CSSProperties,
-  statLabel:  { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 9, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', color: '#3f3f46', marginBottom: 10 } as React.CSSProperties,
+  statLabel:  { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', color: '#71717a', marginBottom: 10 } as React.CSSProperties,
   statVal:    { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 44, fontWeight: 900, color: 'white', lineHeight: 1, letterSpacing: -2 } as React.CSSProperties,
   statBar:    { position: 'absolute', top: 0, left: 0, right: 0, height: 2 } as React.CSSProperties,
   grid2:      { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 } as React.CSSProperties,
   panel:      { background: '#0d0d0d', border: '1px solid #161616', padding: 24 } as React.CSSProperties,
   panelHead:  { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 } as React.CSSProperties,
   panelLine:  { width: 28, height: 2, background: '#dc2626' } as React.CSSProperties,
-  panelTitle: { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', color: '#52525b' } as React.CSSProperties,
+  panelTitle: { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', color: '#a1a1aa' } as React.CSSProperties,
   tableWrap:  { background: '#0d0d0d', border: '1px solid #161616', overflow: 'hidden', marginBottom: 24 } as React.CSSProperties,
-  th:         { padding: '12px 18px', textAlign: 'left' as const, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 10, fontWeight: 700, color: '#3f3f46', textTransform: 'uppercase' as const, letterSpacing: 3 },
+  th:         { padding: '12px 18px', textAlign: 'left' as const, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, fontWeight: 700, color: '#71717a', textTransform: 'uppercase' as const, letterSpacing: 3 },
   td:         { padding: '13px 18px', fontSize: 13, color: '#a1a1aa', borderBottom: '1px solid #111' },
   tab:        { display: 'flex', gap: 2, marginBottom: 20 } as React.CSSProperties,
 };
@@ -98,7 +98,7 @@ export default function WorkforcePage() {
             <div style={S.title}>Workforce</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', color: '#3f3f46', marginBottom: 4 }}>Total Strength</div>
+            <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, letterSpacing: 2, textTransform: 'uppercase', color: '#a1a1aa', marginBottom: 4 }}>Total Strength</div>
             <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 36, fontWeight: 900, color: 'white', lineHeight: 1 }}>
               {labourers.length + contractors.length}<span style={{ color: '#dc2626' }}>+</span>
             </div>
@@ -142,7 +142,7 @@ export default function WorkforcePage() {
             ) : skills.map(([skill, count]) => (
               <div key={skill} style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                  <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: '#71717a' }}>{skill}</span>
+                  <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: '#71717a' }}>{skill}</span>
                   <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 16, fontWeight: 900, color: 'white' }}>{count}</span>
                 </div>
                 <div style={{ height: 4, background: '#1a1a1a', borderRadius: 0, overflow: 'hidden' }}>
@@ -166,7 +166,7 @@ export default function WorkforcePage() {
                   <div key={c.name} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 14, fontWeight: 900, color: 'white' }}>{c.count}</span>
                     <div style={{ width: '100%', background: '#2563eb', height: maxCon ? `${(c.count / maxCon) * 80}px` : '4px', minHeight: 4, transition: 'height 0.5s' }} />
-                    <div style={{ fontSize: 9, color: '#3f3f46', letterSpacing: 1, textAlign: 'center', maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+                    <div style={{ fontSize: 13, color: '#71717a', letterSpacing: 1, textAlign: 'center', maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
                   </div>
                 ))}
               </div>
@@ -199,7 +199,7 @@ export default function WorkforcePage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#3f3f46', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 4, textTransform: 'uppercase', fontSize: 12 }}>Loading...</td></tr>
+                  <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#71717a', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: 'uppercase', fontSize: 12 }}>Loading...</td></tr>
                 ) : labourers.length === 0 ? (
                   <tr><td colSpan={6} style={{ padding: 60, textAlign: 'center', color: '#27272a', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 4, textTransform: 'uppercase', fontSize: 14 }}>No Labourers Found</td></tr>
                 ) : labourers.map(l => (
@@ -208,7 +208,7 @@ export default function WorkforcePage() {
                       {l.user_detail?.first_name} {l.user_detail?.last_name || l.user_detail?.username}
                     </td>
                     <td style={S.td}>
-                      <span style={{ background: 'rgba(37,99,235,0.1)', color: '#60a5fa', padding: '3px 10px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>
+                      <span style={{ background: 'rgba(37,99,235,0.1)', color: '#60a5fa', padding: '3px 10px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>
                         {l.skill || 'Unassigned'}
                       </span>
                     </td>
@@ -217,7 +217,7 @@ export default function WorkforcePage() {
                     {/* FIX: use contractor_name (SerializerMethodField), not contractor_detail which doesn't exist */}
                     <td style={S.td}>{l.contractor_name || '—'}</td>
                     <td style={S.td}>
-                      <span style={{ background: l.is_active ? 'rgba(22,163,74,0.1)' : 'rgba(220,38,38,0.1)', color: l.is_active ? '#4ade80' : '#f87171', padding: '3px 10px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>
+                      <span style={{ background: l.is_active ? 'rgba(22,163,74,0.1)' : 'rgba(220,38,38,0.1)', color: l.is_active ? '#4ade80' : '#f87171', padding: '3px 10px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>
                         {l.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
@@ -241,7 +241,7 @@ export default function WorkforcePage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: '#3f3f46', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 4, textTransform: 'uppercase', fontSize: 12 }}>Loading...</td></tr>
+                  <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: '#71717a', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: 'uppercase', fontSize: 12 }}>Loading...</td></tr>
                 ) : contractors.length === 0 ? (
                   <tr><td colSpan={5} style={{ padding: 60, textAlign: 'center', color: '#27272a', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 4, textTransform: 'uppercase', fontSize: 14 }}>No Contractors Found</td></tr>
                 ) : contractors.map(c => (
@@ -256,7 +256,7 @@ export default function WorkforcePage() {
                       {labourers.filter(l => l.contractor === c.id).length}
                     </td>
                     <td style={S.td}>
-                      <span style={{ background: c.is_active ? 'rgba(22,163,74,0.1)' : 'rgba(220,38,38,0.1)', color: c.is_active ? '#4ade80' : '#f87171', padding: '3px 10px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>
+                      <span style={{ background: c.is_active ? 'rgba(22,163,74,0.1)' : 'rgba(220,38,38,0.1)', color: c.is_active ? '#4ade80' : '#f87171', padding: '3px 10px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>
                         {c.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>

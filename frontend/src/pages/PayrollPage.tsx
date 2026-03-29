@@ -1,503 +1,583 @@
 // frontend/src/pages/PayrollPage.tsx — REPLACE ENTIRE FILE
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/client';
 import { extractResults } from '../utils/pagination';
-import { Plus, X, RefreshCw } from 'lucide-react';
+import { RefreshCw, CheckCircle, X } from 'lucide-react';
 
+// ─── Shared styles ────────────────────────────────────────────────────
 const S = {
-  card:     { background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 8, padding: 20 } as React.CSSProperties,
-  label:    { display: 'block', fontSize: 9, letterSpacing: 4, textTransform: 'uppercase' as const, color: '#71717a', fontWeight: 700, marginBottom: 8 },
-  input:    { width: '100%', background: '#141414', border: '1px solid #1e1e1e', color: 'white', padding: '10px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const, borderRadius: 4 },
-  select:   { width: '100%', background: '#141414', border: '1px solid #1e1e1e', color: 'white', padding: '10px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const, borderRadius: 4 },
-  btn:      { display: 'inline-flex', alignItems: 'center', gap: 8, background: '#dc2626', color: 'white', border: 'none', padding: '10px 20px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase' as const, cursor: 'pointer', borderRadius: 6 },
-  btnGhost: { display: 'inline-flex', alignItems: 'center', gap: 8, background: 'transparent', color: '#a1a1aa', border: '1px solid #1e1e1e', padding: '9px 18px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase' as const, cursor: 'pointer', borderRadius: 6 },
+  card:     { background: '#0d0d0d', border: '1px solid #1a1a1a' } as React.CSSProperties,
+  label:    { display: 'block', fontSize: 13, letterSpacing: 2, textTransform: 'uppercase' as const, color: '#a1a1aa', fontWeight: 700, marginBottom: 8 },
+  input:    { width: '100%', background: '#141414', border: '1px solid #1e1e1e', borderBottom: '2px solid #222', color: 'white', padding: '11px 13px', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const, fontFamily: "'Barlow',sans-serif", transition: 'border-color 0.2s' },
+  select:   { width: '100%', background: '#141414', border: '1px solid #1e1e1e', borderBottom: '2px solid #222', color: 'white', padding: '11px 13px', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const, fontFamily: "'Barlow',sans-serif" },
+  btn:      { display: 'inline-flex', alignItems: 'center', gap: 8, background: '#dc2626', color: 'white', border: 'none', padding: '10px 20px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase' as const, cursor: 'pointer' },
+  btnGhost: { display: 'inline-flex', alignItems: 'center', gap: 8, background: 'transparent', color: '#d4d4d8', border: '1px solid #3f3f46', padding: '9px 18px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase' as const, cursor: 'pointer' },
   overlay:  { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 },
-  modal:    { background: '#0d0d0d', border: '1px solid #1e1e1e', borderTop: '3px solid #dc2626', width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' as const, padding: 28, borderRadius: 8 },
+  modal:    { background: '#0d0d0d', border: '1px solid #1e1e1e', borderTop: '3px solid #dc2626', width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' as const, padding: 28 },
+  th:       { fontSize: 13, letterSpacing: 2, textTransform: 'uppercase' as const, color: '#a1a1aa', fontWeight: 700, padding: '10px 16px', textAlign: 'left' as const },
+  td:       { padding: '13px 16px', fontSize: 13, color: '#a1a1aa', borderBottom: '1px solid #111' },
 };
 
-const STATUS_COLOR: Record<string, string> = { PENDING: '#facc15', APPROVED: '#60a5fa', PAID: '#4ade80' };
-
-function PageHeader({ sub, title }: { sub: string; title: string }) {
-  return (
-    <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: '1px solid #161616', position: 'relative' }}>
-      <div style={{ position: 'absolute', bottom: -1, left: 0, width: 64, height: 3, background: '#dc2626', borderRadius: 2 }} />
-      <div style={{ fontSize: 10, letterSpacing: 4, textTransform: 'uppercase', color: '#71717a', marginBottom: 4, fontWeight: 600 }}>{sub}</div>
-      <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 40, fontWeight: 900, color: 'white', textTransform: 'uppercase', letterSpacing: -1 }}>{title}</div>
-    </div>
-  );
-}
+const STATUS_COLOR: Record<string, string> = {
+  PENDING:  '#facc15',
+  APPROVED: '#60a5fa',
+  PAID:     '#4ade80',
+  VOID:     '#3f3f46',
+};
 
 function StatusBadge({ status }: { status: string }) {
-  const color = STATUS_COLOR[status] || '#71717a';
+  const c = STATUS_COLOR[status] || '#71717a';
   return (
-    <span style={{ fontSize: 10, color, background: `${color}15`, padding: '3px 10px', borderRadius: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+    <span style={{ fontSize: 12, color: c, background: `${c}18`, padding: '3px 10px', fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>
       {status}
     </span>
   );
 }
 
+function PageHeader({ sub, title }: { sub: string; title: string }) {
+  return (
+    <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: '1px solid #161616', position: 'relative' }}>
+      <div style={{ position: 'absolute', bottom: -1, left: 0, width: 64, height: 3, background: '#dc2626' }} />
+      <div style={{ fontSize: 12, letterSpacing: 2, textTransform: 'uppercase', color: '#71717a', marginBottom: 4, fontWeight: 600 }}>{sub}</div>
+      <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 40, fontWeight: 900, color: 'white', textTransform: 'uppercase', letterSpacing: -1 }}>{title}</div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color: string }) {
+  return (
+    <div style={{ ...S.card, padding: '18px 20px', borderTop: `2px solid ${color}` }}>
+      <div style={{ fontSize: 13, letterSpacing: 2, textTransform: 'uppercase', color: '#a1a1aa', fontWeight: 700, marginBottom: 10 }}>{label}</div>
+      <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 30, fontWeight: 900, color, letterSpacing: -1, lineHeight: 1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 13, color: '#a1a1aa', marginTop: 6 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+      <div style={{ width: 28, height: 2, background: '#dc2626' }} />
+      <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', color: '#a1a1aa' }}>{children}</div>
+    </div>
+  );
+}
+
+function Loader() {
+  return <div style={{ ...S.card, padding: '40px 0', textAlign: 'center', color: '#71717a', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 4, textTransform: 'uppercase', fontSize: 12 }}>Loading...</div>;
+}
+
+function Empty({ msg }: { msg: string }) {
+  return <div style={{ ...S.card, padding: '40px 20px', textAlign: 'center', color: '#71717a', fontSize: 13 }}>{msg}</div>;
+}
+
+// ─── Root router ──────────────────────────────────────────────────────
 export default function PayrollPage() {
   const { user } = useAuth();
   const role = user?.role;
-  if (role === 'HR')         return <HRPayrollView />;
-  if (role === 'SUPERVISOR') return <SupervisorPayrollView />;
-  if (role === 'CONTRACTOR') return <ContractorPayrollView />;
-  return <div style={{ color: '#52525b', padding: 40 }}>Payroll not available for your role.</div>;
+  if (role === 'HR')         return <HRView />;
+  if (role === 'SUPERVISOR') return <SupervisorView />;
+  if (role === 'CONTRACTOR') return <ContractorView />;
+  return <div style={{ color: '#a1a1aa', padding: 40 }}>Payroll not available for your role.</div>;
 }
 
-function HRPayrollView() {
-  const [tab, setTab]               = useState<'supervisor' | 'contractor' | 'labourer'>('supervisor');
-  const [projects, setProjects]     = useState<any[]>([]);
-  const [selectedProject, setSelectedProject] = useState('');
-  const [dashboard, setDashboard]   = useState<any>({});
-  const [showNewProject, setShowNewProject] = useState(false);
-  const [supervisors, setSupervisors] = useState<any[]>([]);
-  const [projectForm, setProjectForm] = useState({ name: '', supervisor: '', location: '', start_date: '', end_date: '' });
+// ═══════════════════════════════════════════════════════════════════
+// HR VIEW
+// ═══════════════════════════════════════════════════════════════════
+function HRView() {
+  const [tab, setTab]       = useState<'supervisor' | 'contractor' | 'labourer'>('supervisor');
+  const [dash, setDash]     = useState<any>({});
+  const [monthFilter, setMonth] = useState('');
 
-  const loadData = useCallback(() => {
-    apiClient.get('/payroll/dashboard/').then(r => setDashboard(r.data)).catch(() => {});
-    apiClient.get('/attendance/projects/').then(r => setProjects(extractResults<any>(r.data))).catch(() => {});
-    apiClient.get('/auth/users/?role=SUPERVISOR').then(r => setSupervisors(extractResults<any>(r.data))).catch(() => {});
+  const load = useCallback(() => {
+    apiClient.get('/payroll/dashboard/').then(r => setDash(r.data)).catch(() => {});
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { load(); }, [load]);
 
-  const handleCreateProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await apiClient.post('/attendance/projects/', { ...projectForm, supervisor: projectForm.supervisor || null });
-      setShowNewProject(false);
-      setProjectForm({ name: '', supervisor: '', location: '', start_date: '', end_date: '' });
-      loadData();
-    } catch (err: any) { alert(JSON.stringify(err.response?.data)); }
-  };
+  const sup = dash.supervisor || {};
+  const con = dash.contractor || {};
+  const lab = dash.labourer   || {};
 
   return (
     <div style={{ animation: 'pageIn 0.4s ease' }}>
-      <style>{`@keyframes pageIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
-      <PageHeader sub="HR Administration" title="Payroll Management" />
+      <style>{`@keyframes pageIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}} .pr-row:hover td{background:#111!important} select option{background:#141414;color:white} .pr-input:focus{border-bottom-color:#dc2626!important}`}</style>
+
+      <PageHeader sub="HR Administration" title="Payroll Overview" />
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 28 }}>
-        {[
-          { label: 'Supervisor Payroll', data: dashboard.supervisor_payrolls, color: '#a78bfa' },
-          { label: 'Contractor Payroll', data: dashboard.contractor_payrolls, color: '#facc15' },
-          { label: 'Labourer Payroll',   data: dashboard.labourer_payrolls,   color: '#4ade80' },
-        ].map(({ label, data, color }) => data && (
-          <div key={label} style={{ ...S.card, borderTop: `2px solid ${color}` }}>
-            <div style={{ fontSize: 9, letterSpacing: 4, textTransform: 'uppercase', color: '#71717a', fontWeight: 700, marginBottom: 12 }}>{label}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
-              {['pending', 'approved', 'paid'].map(k => (
-                <div key={k} style={{ textAlign: 'center' }}>
-                  <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 24, fontWeight: 900, color: STATUS_COLOR[k.toUpperCase()] }}>{data[k]}</div>
-                  <div style={{ fontSize: 9, color: '#52525b', letterSpacing: 2, textTransform: 'uppercase', fontWeight: 700 }}>{k}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ borderTop: '1px solid #1a1a1a', paddingTop: 10 }}>
-              <span style={{ fontSize: 11, color: '#71717a' }}>Total Payable: </span>
-              <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 18, fontWeight: 800, color }}>
-                ₹{Number(data.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 2, marginBottom: 28 }}>
+        <div style={{ ...S.card, padding: '18px 20px', borderTop: '2px solid #a78bfa' }}>
+          <div style={{ fontSize: 13, letterSpacing: 4, color: '#71717a', fontWeight: 700, textTransform: 'uppercase', marginBottom: 10 }}>Supervisor Monthly Pay</div>
+          <div style={{ display: 'flex', gap: 20, marginBottom: 8 }}>
+            {([['Pending', sup.pending, '#facc15'], ['Approved', sup.approved, '#60a5fa'], ['Paid', sup.paid, '#4ade80']] as [string, number, string][]).map(([l, v, c]) => (
+              <div key={l}>
+                <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 24, fontWeight: 900, color: c }}>{v ?? 0}</div>
+                <div style={{ fontSize: 13, color: '#71717a', letterSpacing: 2, textTransform: 'uppercase', fontWeight: 700 }}>{l}</div>
+              </div>
+            ))}
           </div>
-        ))}
+          <div style={{ fontSize: 13, color: '#71717a' }}>Total: <span style={{ color: '#a78bfa', fontWeight: 700 }}>₹{Number(sup.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+          <div style={{ fontSize: 12, color: '#71717a', marginTop: 4 }}>⚡ Auto-generated on the 5th of each month</div>
+        </div>
+
+        <div style={{ ...S.card, padding: '18px 20px', borderTop: '2px solid #facc15' }}>
+          <div style={{ fontSize: 13, letterSpacing: 2, color: '#71717a', fontWeight: 700, textTransform: 'uppercase', marginBottom: 10 }}>Contractor Project Pay</div>
+          <div style={{ display: 'flex', gap: 20, marginBottom: 8 }}>
+            {([['Pending', con.pending, '#facc15'], ['Paid', con.paid, '#4ade80']] as [string, number, string][]).map(([l, v, c]) => (
+              <div key={l}>
+                <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 24, fontWeight: 900, color: c }}>{v ?? 0}</div>
+                <div style={{ fontSize: 13, color: '#71717a', letterSpacing: 2, textTransform: 'uppercase', fontWeight: 700 }}>{l}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 13, color: '#71717a' }}>All-time paid: <span style={{ color: '#facc15', fontWeight: 700 }}>₹{Number(con.total_paid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+          <div style={{ fontSize: 12, color: '#71717a', marginTop: 4 }}>⚡ Fixed amount per project · Supervisor approves</div>
+        </div>
+
+        <div style={{ ...S.card, padding: '18px 20px', borderTop: '2px solid #4ade80' }}>
+          <div style={{ fontSize: 13, letterSpacing: 2, color: '#71717a', fontWeight: 700, textTransform: 'uppercase', marginBottom: 10 }}>Labourer Daily Pay</div>
+          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 24, fontWeight: 900, color: '#4ade80', marginBottom: 6 }}>
+            {lab.total_records ?? 0} <span style={{ fontSize: 13, color: '#a1a1aa' }}>records</span>
+          </div>
+          <div style={{ fontSize: 13, color: '#71717a' }}>All-time: <span style={{ color: '#4ade80', fontWeight: 700 }}>₹{Number(lab.total_paid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+          <div style={{ fontSize: 13, color: '#71717a', marginTop: 2 }}>Today: <span style={{ color: '#4ade80', fontWeight: 700 }}>₹{Number(lab.today || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+          <div style={{ fontSize: 12, color: '#71717a', marginTop: 4 }}>⚡ Auto-paid when attendance is marked</div>
+        </div>
       </div>
 
-      {/* Projects */}
-      <div style={{ ...S.card, marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 14, fontWeight: 800, color: 'white', textTransform: 'uppercase', letterSpacing: 2 }}>Projects</div>
-          <button style={{ ...S.btn, padding: '6px 12px', fontSize: 10 }} onClick={() => setShowNewProject(true)}><Plus size={12} /> New</button>
+      {/* Month filter */}
+      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 12, marginBottom: 20 }}>
+        <div>
+          <label style={S.label}>Month (Supervisor payroll)</label>
+          <input type="month" className="pr-input" style={S.input} value={monthFilter} onChange={e => setMonth(e.target.value)} />
         </div>
-        <select style={{ ...S.select, marginBottom: 12 }} value={selectedProject} onChange={e => setSelectedProject(e.target.value)}>
-          <option value="">All Projects</option>
-          {projects.map(p => <option key={p.id} value={p.id}>{p.name} — {p.status}</option>)}
-        </select>
-        {projects.filter(p => !selectedProject || String(p.id) === selectedProject).map(p => (
-          <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #111' }}>
-            <div>
-              <div style={{ fontWeight: 600, color: 'white', fontSize: 13 }}>{p.name}</div>
-              <div style={{ fontSize: 11, color: '#71717a' }}>{p.supervisor_name || '—'} · {p.start_date}</div>
-            </div>
-            <span style={{ fontSize: 10, color: p.status === 'ACTIVE' ? '#4ade80' : '#52525b', background: p.status === 'ACTIVE' ? 'rgba(22,163,74,0.1)' : '#111', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>{p.status}</span>
-          </div>
-        ))}
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 20, background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 8, padding: 4 }}>
-        {([['supervisor', 'Supervisor Payroll'], ['contractor', 'Contractor Payroll'], ['labourer', 'Labourer Payroll']] as [string, string][]).map(([key, label]) => (
-          <button key={key} onClick={() => setTab(key as any)} style={{ flex: 1, padding: '9px 0', background: tab === key ? '#dc2626' : 'transparent', color: tab === key ? 'white' : '#52525b', border: 'none', borderRadius: 6, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.2s' }}>
-            {label}
-          </button>
+      <div style={{ display: 'flex', gap: 2, marginBottom: 20, background: '#0a0a0a', border: '1px solid #1a1a1a', padding: 4 }}>
+        {([['supervisor', 'Supervisor Monthly'], ['contractor', 'Contractor Projects'], ['labourer', 'Labourer Daily']] as [string, string][]).map(([key, lbl]) => (
+          <button key={key} onClick={() => setTab(key as any)} style={{
+            flex: 1, padding: '9px 0',
+            background: tab === key ? '#dc2626' : 'transparent',
+            color: tab === key ? 'white' : '#52525b', border: 'none',
+            fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, fontWeight: 700,
+            letterSpacing: 2, textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.2s',
+          }}>{lbl}</button>
         ))}
       </div>
 
-      {tab === 'supervisor' && <PayrollTable type="supervisor" projectId={selectedProject} />}
-      {tab === 'contractor' && <PayrollTable type="contractor" projectId={selectedProject} />}
-      {tab === 'labourer'   && <PayrollTable type="labourer"   projectId={selectedProject} />}
+      {tab === 'supervisor' && <SupervisorPayrollTable canApprove monthFilter={monthFilter} onRefreshDash={load} />}
+      {tab === 'contractor' && <ContractorPayrollTable />}
+      {tab === 'labourer'   && <LabourerPayrollTable />}
+    </div>
+  );
+}
 
-      {showNewProject && (
+// ═══════════════════════════════════════════════════════════════════
+// SUPERVISOR VIEW
+// ═══════════════════════════════════════════════════════════════════
+function SupervisorView() {
+  const [dash, setDash] = useState<any>({});
+  useEffect(() => { apiClient.get('/payroll/dashboard/').then(r => setDash(r.data)).catch(() => {}); }, []);
+  const my = dash.my_salary || {};
+  const cp = dash.contractor_payouts || {};
+
+  return (
+    <div style={{ animation: 'pageIn 0.4s ease' }}>
+      <style>{`@keyframes pageIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}} .pr-row:hover td{background:#111!important} select option{background:#141414;color:white} .pr-input:focus{border-bottom-color:#dc2626!important}`}</style>
+      <PageHeader sub="Supervisor Portal" title="Payroll" />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 2, marginBottom: 28 }}>
+        <StatCard label="Total Earned"     value={`₹${Number(my.total_earned || 0).toLocaleString('en-IN')}`} color="#4ade80" />
+        <StatCard label="Next Payment"     value={`₹${Number(my.next_pending || 0).toLocaleString('en-IN')}`} color="#facc15" />
+        <StatCard label="Contractor Pending Payouts" value={cp.pending ?? 0} color="#facc15" sub="Awaiting your approval" />
+        <StatCard label="Contractor Paid"  value={cp.paid ?? 0}  color="#4ade80" />
+      </div>
+
+      <div style={{ marginBottom: 32 }}>
+        <SectionHeading>My Monthly Salary</SectionHeading>
+        <SupervisorPayrollTable canApprove={false} />
+      </div>
+
+      <SectionHeading>Contractor Project Payouts</SectionHeading>
+      <ContractorPayrollTable />
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CONTRACTOR VIEW
+// ═══════════════════════════════════════════════════════════════════
+function ContractorView() {
+  const [dash, setDash] = useState<any>({});
+  useEffect(() => { apiClient.get('/payroll/dashboard/').then(r => setDash(r.data)).catch(() => {}); }, []);
+  const my = dash.my_projects || {};
+
+  return (
+    <div style={{ animation: 'pageIn 0.4s ease' }}>
+      <style>{`@keyframes pageIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}} .pr-row:hover td{background:#111!important} select option{background:#141414;color:white}`}</style>
+      <PageHeader sub="Contractor Portal" title="Payroll" />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 2, marginBottom: 28 }}>
+        <StatCard label="Total Earned"      value={`₹${Number(my.total_earned || 0).toLocaleString('en-IN')}`} color="#4ade80" />
+        <StatCard label="Pending Amount"    value={`₹${Number(my.pending_amount || 0).toLocaleString('en-IN')}`} color="#facc15" />
+        <StatCard label="Labourers Today"   value={`₹${Number(dash.labourer_today || 0).toLocaleString('en-IN')}`} color="#60a5fa" />
+        <StatCard label="Labourers This Month" value={`₹${Number(dash.labourer_month || 0).toLocaleString('en-IN')}`} color="#a78bfa" />
+      </div>
+
+      <div style={{ marginBottom: 32 }}>
+        <SectionHeading>My Project Payments</SectionHeading>
+        <ContractorPayrollTable />
+      </div>
+
+      <SectionHeading>My Labourers' Daily Pay</SectionHeading>
+      <LabourerPayrollTable />
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SUPERVISOR PAYROLL TABLE (HR can approve / mark paid)
+// ═══════════════════════════════════════════════════════════════════
+function SupervisorPayrollTable({ canApprove = false, monthFilter = '', onRefreshDash }: { canApprove?: boolean; monthFilter?: string; onRefreshDash?: () => void }) {
+  const [records, setRecords]     = useState<any[]>([]);
+  const [loading, setLoading]     = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm]   = useState<any>({});
+  const [saving, setSaving]       = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      let url = '/payroll/supervisor/?';
+      if (monthFilter) url += `month=${monthFilter}&`;
+      const res = await apiClient.get(url);
+      setRecords(extractResults(res.data));
+    } catch {}
+    finally { setLoading(false); }
+  }, [monthFilter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const approve = async (id: number, newStatus: 'APPROVED' | 'PAID') => {
+    try {
+      await apiClient.patch(`/payroll/supervisor/${id}/`, { status: newStatus });
+      load(); onRefreshDash?.();
+    } catch { alert('Failed to update.'); }
+  };
+
+  const saveEdit = async (e: React.FormEvent) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      await apiClient.patch(`/payroll/supervisor/${editingId}/`, editForm);
+      setEditingId(null); load();
+    } catch (err: any) { alert(JSON.stringify(err.response?.data)); }
+    finally { setSaving(false); }
+  };
+
+  const total = records.reduce((s, r) => s + parseFloat(r.total_amount || 0), 0);
+
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <span style={{ fontSize: 13, color: '#a1a1aa', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: 'uppercase' }}>
+          {records.length} records · ₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+        </span>
+        <button style={S.btnGhost} onClick={load}><RefreshCw size={11} />Refresh</button>
+      </div>
+
+      {loading ? <Loader /> : records.length === 0 ? (
+        <Empty msg="No supervisor payroll records. Run: python manage.py generate_supervisor_payroll" />
+      ) : (
+        <div style={{ ...S.card, overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
+            <thead>
+              <tr style={{ background: '#0a0a0a', borderBottom: '1px solid #1a1a1a' }}>
+                {['Supervisor', 'Month', 'Salary', 'Bonus', 'Deductions', 'Total', 'Status', ...(canApprove ? ['Actions'] : [])].map(h => (
+                  <th key={h} style={S.th}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((r, i) => {
+                const bg = i % 2 === 0 ? '#0d0d0d' : '#0a0a0a';
+                return (
+                  <tr key={r.id} className="pr-row">
+                    <td style={{ ...S.td, background: bg }}>
+                      <div style={{ fontWeight: 600, color: 'white', fontSize: 13 }}>{r.supervisor_name}</div>
+                      {r.approved_by_name && <div style={{ fontSize: 12, color: '#71717a', marginTop: 2 }}>✓ {r.approved_by_name}</div>}
+                    </td>
+                    <td style={{ ...S.td, background: bg, fontFamily: "'Barlow Condensed',sans-serif", color: 'white', fontWeight: 700 }}>{r.month_display}</td>
+                    <td style={{ ...S.td, background: bg }}>₹{Number(r.monthly_salary).toLocaleString('en-IN')}</td>
+                    <td style={{ ...S.td, background: bg, color: '#4ade80' }}>+₹{Number(r.bonus || 0).toLocaleString('en-IN')}</td>
+                    <td style={{ ...S.td, background: bg, color: '#f87171' }}>-₹{Number(r.deductions || 0).toLocaleString('en-IN')}</td>
+                    <td style={{ ...S.td, background: bg, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 18, fontWeight: 900, color: '#4ade80' }}>
+                      ₹{Number(r.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ ...S.td, background: bg }}><StatusBadge status={r.status} /></td>
+                    {canApprove && (
+                      <td style={{ ...S.td, background: bg }}>
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                          {r.status === 'PENDING' && (
+                            <button onClick={() => { setEditingId(r.id); setEditForm({ monthly_salary: r.monthly_salary, bonus: r.bonus || 0, deductions: r.deductions || 0, notes: r.notes || '' }); }}
+                              style={{ padding: '4px 9px', background: '#141414', border: '1px solid #1e1e1e', color: '#a1a1aa', fontSize: 13, fontWeight: 700, cursor: 'pointer', letterSpacing: 1 }}>
+                              EDIT
+                            </button>
+                          )}
+                          {r.status === 'PENDING' && (
+                            <button onClick={() => approve(r.id, 'APPROVED')}
+                              style={{ padding: '4px 9px', background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.3)', color: '#60a5fa', fontSize: 13, fontWeight: 700, cursor: 'pointer', letterSpacing: 1, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                              <CheckCircle size={9} /> APPROVE
+                            </button>
+                          )}
+                          {r.status === 'APPROVED' && (
+                            <button onClick={() => approve(r.id, 'PAID')}
+                              style={{ padding: '4px 9px', background: 'rgba(22,163,74,0.1)', border: '1px solid rgba(22,163,74,0.3)', color: '#4ade80', fontSize: 13, fontWeight: 700, cursor: 'pointer', letterSpacing: 1 }}>
+                              MARK PAID
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {editingId !== null && (
         <div style={S.overlay}>
           <div style={S.modal}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #1a1a1a' }}>
-              <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 22, fontWeight: 900, color: 'white', textTransform: 'uppercase' }}>New Project</div>
-              <button onClick={() => setShowNewProject(false)} style={{ background: '#1a1a1a', border: '1px solid #222', color: '#a1a1aa', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 5 }}><X size={13} /></button>
+              <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 22, fontWeight: 900, color: 'white', textTransform: 'uppercase' }}>Adjust Payroll</div>
+              <button onClick={() => setEditingId(null)} style={{ background: '#1a1a1a', border: 'none', color: '#a1a1aa', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><X size={13} /></button>
             </div>
-            <form onSubmit={handleCreateProject}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <form onSubmit={saveEdit}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                 <div style={{ gridColumn: '1/-1' }}>
-                  <label style={S.label}>Project Name *</label>
-                  <input style={S.input} required value={projectForm.name} onChange={e => setProjectForm({ ...projectForm, name: e.target.value })} />
+                  <label style={S.label}>Monthly Salary (₹)</label>
+                  <input className="pr-input" type="number" min="0" step="0.01" style={S.input} value={editForm.monthly_salary} onChange={e => setEditForm({ ...editForm, monthly_salary: e.target.value })} />
                 </div>
                 <div>
-                  <label style={S.label}>Supervisor</label>
-                  <select style={S.select} value={projectForm.supervisor} onChange={e => setProjectForm({ ...projectForm, supervisor: e.target.value })}>
-                    <option value="">— Select Supervisor —</option>
-                    {supervisors.map(s => <option key={s.id} value={s.id}>{s.first_name} {s.last_name || s.username}</option>)}
-                  </select>
+                  <label style={S.label}>Bonus (₹)</label>
+                  <input className="pr-input" type="number" min="0" step="0.01" style={S.input} value={editForm.bonus} onChange={e => setEditForm({ ...editForm, bonus: e.target.value })} />
                 </div>
                 <div>
-                  <label style={S.label}>Location</label>
-                  <input style={S.input} value={projectForm.location} onChange={e => setProjectForm({ ...projectForm, location: e.target.value })} />
+                  <label style={S.label}>Deductions (₹)</label>
+                  <input className="pr-input" type="number" min="0" step="0.01" style={S.input} value={editForm.deductions} onChange={e => setEditForm({ ...editForm, deductions: e.target.value })} />
                 </div>
-                <div>
-                  <label style={S.label}>Start Date *</label>
-                  <input type="date" style={S.input} required value={projectForm.start_date} onChange={e => setProjectForm({ ...projectForm, start_date: e.target.value })} />
-                </div>
-                <div>
-                  <label style={S.label}>End Date</label>
-                  <input type="date" style={S.input} value={projectForm.end_date} onChange={e => setProjectForm({ ...projectForm, end_date: e.target.value })} />
+                <div style={{ gridColumn: '1/-1' }}>
+                  <label style={S.label}>Notes</label>
+                  <input className="pr-input" style={S.input} value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button type="submit" style={S.btn}>Create Project</button>
-                <button type="button" style={S.btnGhost} onClick={() => setShowNewProject(false)}>Cancel</button>
+                <button type="submit" disabled={saving} style={{ ...S.btn, background: saving ? '#27272a' : '#dc2626' }}>
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+                <button type="button" style={S.btnGhost} onClick={() => setEditingId(null)}>Cancel</button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
-function SupervisorPayrollView() {
-  return (
-    <div style={{ animation: 'pageIn 0.4s ease' }}>
-      <PageHeader sub="Supervisor Portal" title="My Payroll" />
-      <PayrollTable type="supervisor" projectId="" />
-    </div>
-  );
-}
-
-function ContractorPayrollView() {
-  const [projects, setProjects]         = useState<any[]>([]);
-  const [selectedProject, setSelectedProject] = useState('');
-  useEffect(() => {
-    apiClient.get('/attendance/projects/').then(r => setProjects(extractResults<any>(r.data))).catch(() => {});
-  }, []);
-  return (
-    <div style={{ animation: 'pageIn 0.4s ease' }}>
-      <PageHeader sub="Contractor Portal" title="My Payroll" />
-      <div style={{ marginBottom: 20 }}>
-        <label style={S.label}>Filter by Project</label>
-        <select style={{ ...S.select, maxWidth: 320 }} value={selectedProject} onChange={e => setSelectedProject(e.target.value)}>
-          <option value="">All Projects</option>
-          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-      </div>
-      <PayrollTable type="contractor" projectId={selectedProject} />
-      <div style={{ marginTop: 28 }}>
-        <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 16, fontWeight: 800, color: 'white', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 16 }}>My Labourers' Payroll</div>
-        <PayrollTable type="labourer" projectId={selectedProject} />
-      </div>
-    </div>
-  );
-}
-
-function PayrollTable({ type, projectId }: { type: 'supervisor' | 'contractor' | 'labourer'; projectId: string }) {
+// ═══════════════════════════════════════════════════════════════════
+// CONTRACTOR PROJECT PAYROLL TABLE
+// ═══════════════════════════════════════════════════════════════════
+function ContractorPayrollTable() {
+  const { user } = useAuth();
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showForm, setShowForm] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      let url = `/payroll/${type}/?`;
-      if (projectId) url += `project=${projectId}&`;
-      const res = await apiClient.get(url);
-      setRecords(extractResults<any>(res.data));
-    } catch (e) { console.error(e); }
+      const res = await apiClient.get('/payroll/contractor/');
+      setRecords(extractResults(res.data));
+    } catch {}
     finally { setLoading(false); }
-  }, [type, projectId]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const updateStatus = async (id: number, status: string) => {
+  const approvePayout = async (id: number) => {
+    if (!window.confirm('Mark this project payment as PAID?')) return;
     try {
-      await apiClient.patch(`/payroll/${type}/${id}/`, { status });
+      await apiClient.patch(`/payroll/contractor/${id}/`, { status: 'PAID' });
       load();
-    } catch { alert('Failed to update status.'); }
+    } catch { alert('Failed to approve.'); }
   };
-
-  const autoCalc = async (id: number) => {
-    try {
-      // FIX: correct URL is /payroll/labourer/<id>/calculate/
-      await apiClient.post(`/payroll/labourer/${id}/calculate/`);
-      load();
-    } catch { alert('Calculation failed.'); }
-  };
-
-  const totalAmount = records.reduce((sum, r) => sum + parseFloat(r.total_amount || 0), 0);
-  const cols    = type === 'labourer' ? '1.5fr 1fr 1.2fr 0.7fr 1fr 120px 80px' : '1.5fr 1fr 1fr 1fr 120px 80px';
-  const headers = type === 'labourer'
-    ? ['Name', 'Project', 'Date Range', 'Days', 'Amount', 'Status', '']
-    : ['Name', 'Project', 'Month / Period', 'Amount', 'Status', ''];
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 20, height: 2, background: '#dc2626' }} />
-          <span style={{ fontSize: 11, color: '#71717a', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700 }}>
-            {records.length} records · Total: ₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={S.btnGhost} onClick={load}><RefreshCw size={12} /> Refresh</button>
-          <button style={S.btn} onClick={() => setShowForm(true)}><Plus size={12} /> Add</button>
-        </div>
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <span style={{ fontSize: 13, color: '#a1a1aa', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: 'uppercase' }}>
+          {records.length} project payroll records
+        </span>
+        <button style={S.btnGhost} onClick={load}><RefreshCw size={11} />Refresh</button>
       </div>
 
-      {loading ? (
-        <div style={{ ...S.card, color: '#52525b', textAlign: 'center', padding: 40 }}>Loading...</div>
-      ) : records.length === 0 ? (
-        <div style={{ ...S.card, color: '#3f3f46', textAlign: 'center', padding: 40 }}>No payroll records found.</div>
+      {loading ? <Loader /> : records.length === 0 ? (
+        <Empty msg="No contractor payroll records yet. Assign contractors to projects via the Projects tab." />
       ) : (
-        <div style={{ ...S.card, padding: 0, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '10px 16px', background: '#0a0a0a', borderBottom: '1px solid #1a1a1a', gap: 8 }}>
-            {headers.map(h => <span key={h} style={{ fontSize: 9, letterSpacing: 3, textTransform: 'uppercase', color: '#3f3f46', fontWeight: 700 }}>{h}</span>)}
-          </div>
-          {records.map((r, i) => (
-            <div key={r.id} style={{ display: 'grid', gridTemplateColumns: cols, padding: '13px 16px', background: i % 2 === 0 ? '#0d0d0d' : '#0a0a0a', borderBottom: '1px solid #111', alignItems: 'center', gap: 8 }}>
-              <div style={{ fontWeight: 600, color: 'white', fontSize: 13 }}>
-                {r.supervisor_name || r.contractor_name || r.labourer_name}
-                {r.is_temp && <span style={{ fontSize: 9, color: '#facc15', marginLeft: 6, background: 'rgba(202,138,4,0.1)', padding: '1px 5px', borderRadius: 6 }}>TEMP</span>}
-              </div>
-              <div style={{ fontSize: 12, color: '#a1a1aa' }}>{r.project_name}</div>
-              {type === 'labourer'
-                ? <div style={{ fontSize: 11, color: '#a1a1aa' }}>{r.start_date} → {r.end_date}</div>
-                : <div style={{ fontSize: 12, color: '#a1a1aa' }}>{r.month || r.period_name || '—'}</div>
-              }
-              {type === 'labourer' && <div style={{ fontSize: 12, color: '#a1a1aa' }}>{r.days_present}d</div>}
-              <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 16, fontWeight: 800, color: '#4ade80' }}>
-                ₹{Number(r.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </div>
-              <StatusBadge status={r.status} />
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                {r.status === 'PENDING' && (
-                  <button onClick={() => updateStatus(r.id, 'APPROVED')} style={{ padding: '4px 8px', background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.3)', color: '#60a5fa', borderRadius: 4, fontSize: 9, fontWeight: 700, cursor: 'pointer' }}>APPROVE</button>
-                )}
-                {r.status === 'APPROVED' && (
-                  <button onClick={() => updateStatus(r.id, 'PAID')} style={{ padding: '4px 8px', background: 'rgba(22,163,74,0.1)', border: '1px solid rgba(22,163,74,0.3)', color: '#4ade80', borderRadius: 4, fontSize: 9, fontWeight: 700, cursor: 'pointer' }}>PAID</button>
-                )}
-                {type === 'labourer' && (
-                  <button onClick={() => autoCalc(r.id)} style={{ padding: '4px 8px', background: '#141414', border: '1px solid #1e1e1e', color: '#71717a', borderRadius: 4, fontSize: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <RefreshCw size={10} /> Calc
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+        <div style={{ ...S.card, overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
+            <thead>
+              <tr style={{ background: '#0a0a0a', borderBottom: '1px solid #1a1a1a' }}>
+                {['Contractor', 'Project', 'Supervisor', 'Contract Amt', 'Advance', 'Deductions', 'Total', 'Status', ...(user?.role !== 'CONTRACTOR' ? ['Actions'] : [])].map(h => (
+                  <th key={h} style={S.th}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((r, i) => {
+                const bg = i % 2 === 0 ? '#0d0d0d' : '#0a0a0a';
+                return (
+                  <tr key={r.id} className="pr-row">
+                    <td style={{ ...S.td, background: bg }}>
+                      <div style={{ fontWeight: 600, color: 'white', fontSize: 13 }}>{r.contractor_name}</div>
+                      {r.contractor_company && <div style={{ fontSize: 12, color: '#a1a1aa', marginTop: 2 }}>{r.contractor_company}</div>}
+                    </td>
+                    <td style={{ ...S.td, background: bg, color: 'white', fontWeight: 600 }}>{r.project_name}</td>
+                    <td style={{ ...S.td, background: bg }}>{r.supervisor_name || '—'}</td>
+                    <td style={{ ...S.td, background: bg }}>₹{Number(r.contract_amount).toLocaleString('en-IN')}</td>
+                    <td style={{ ...S.td, background: bg, color: '#f87171' }}>
+                      {Number(r.advance_paid) > 0 ? `-₹${Number(r.advance_paid).toLocaleString('en-IN')}` : '—'}
+                    </td>
+                    <td style={{ ...S.td, background: bg, color: '#f87171' }}>
+                      {Number(r.deductions) > 0 ? `-₹${Number(r.deductions).toLocaleString('en-IN')}` : '—'}
+                    </td>
+                    <td style={{ ...S.td, background: bg, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 18, fontWeight: 900, color: '#4ade80' }}>
+                      ₹{Number(r.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ ...S.td, background: bg }}><StatusBadge status={r.status} /></td>
+                    {user?.role !== 'CONTRACTOR' && (
+                      <td style={{ ...S.td, background: bg }}>
+                        {r.status === 'PENDING' && (
+                          <button onClick={() => approvePayout(r.id)}
+                            style={{ padding: '4px 10px', background: 'rgba(22,163,74,0.1)', border: '1px solid rgba(22,163,74,0.3)', color: '#4ade80', fontSize: 13, fontWeight: 700, cursor: 'pointer', letterSpacing: 1, display: 'inline-flex', alignItems: 'center', gap: 3, fontFamily: "'Barlow Condensed',sans-serif" }}>
+                            <CheckCircle size={9} /> PAY NOW
+                          </button>
+                        )}
+                        {r.status === 'PAID' && r.approved_by_name && (
+                          <div style={{ fontSize: 12, color: '#71717a' }}>✓ {r.approved_by_name}</div>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
-      {showForm && <AddPayrollModal type={type} onClose={() => { setShowForm(false); load(); }} />}
-    </div>
+    </>
   );
 }
 
-// FIX: Added `period` field to contractor payroll form (required by model constraint)
-function AddPayrollModal({ type, onClose }: { type: string; onClose: () => void }) {
-  const [form, setForm]           = useState<any>({});
-  const [projects, setProjects]   = useState<any[]>([]);
-  const [periods, setPeriods]     = useState<any[]>([]);   // FIX: periods for contractor payroll
-  const [supervisors, setSupervisors] = useState<any[]>([]);
-  const [contractors, setContractors] = useState<any[]>([]);
-  const [labourers, setLabourers]     = useState<any[]>([]);
-  const [tempLabs, setTempLabs]       = useState<any[]>([]);
+// ═══════════════════════════════════════════════════════════════════
+// LABOURER DAILY PAYROLL TABLE — read-only
+// ═══════════════════════════════════════════════════════════════════
+function LabourerPayrollTable() {
+  const [records, setRecords]       = useState<any[]>([]);
+  const [loading, setLoading]       = useState(false);
+  const [dateFilter, setDate]       = useState('');
+  const [projectFilter, setProject] = useState('');
+  const [projects, setProjects]     = useState<any[]>([]);
 
   useEffect(() => {
-    apiClient.get('/attendance/projects/').then(r => setProjects(extractResults<any>(r.data))).catch(() => {});
-    if (type === 'supervisor') apiClient.get('/auth/users/?role=SUPERVISOR').then(r => setSupervisors(extractResults<any>(r.data))).catch(() => {});
-    if (type === 'contractor') apiClient.get('/workforce/contractors/').then(r => setContractors(extractResults<any>(r.data))).catch(() => {});
-    if (type === 'labourer') {
-      apiClient.get('/workforce/labourers/').then(r => setLabourers(extractResults<any>(r.data))).catch(() => {});
-      apiClient.get('/attendance/temp-labourers/').then(r => setTempLabs(extractResults<any>(r.data))).catch(() => {});
-    }
-  }, [type]);
+    apiClient.get('/attendance/projects/').then(r => setProjects(extractResults(r.data))).catch(() => {});
+  }, []);
 
-  // FIX: Load periods when project is selected (needed for ContractorPayroll)
-  useEffect(() => {
-    if (type === 'contractor' && form.project) {
-      apiClient.get(`/attendance/periods/?project=${form.project}`)
-        .then(r => setPeriods(extractResults<any>(r.data)))
-        .catch(() => setPeriods([]));
-    }
-  }, [type, form.project]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const load = useCallback(async () => {
+    setLoading(true);
     try {
-      await apiClient.post(`/payroll/${type}/`, { ...form });
-      onClose();
-    } catch (err: any) { alert(JSON.stringify(err.response?.data)); }
-  };
+      let url = '/payroll/labourer/?';
+      if (dateFilter)    url += `date=${dateFilter}&`;
+      if (projectFilter) url += `project=${projectFilter}&`;
+      const res = await apiClient.get(url);
+      setRecords(extractResults(res.data));
+    } catch {}
+    finally { setLoading(false); }
+  }, [dateFilter, projectFilter]);
 
-  const getName = (c: any) => {
-    const n = c.user_detail || c.user || {};
-    return [n.first_name, n.last_name || n.username].filter(Boolean).join(' ').trim() || `#${c.id}`;
-  };
+  useEffect(() => { load(); }, [load]);
+
+  const total = records.reduce((s, r) => s + parseFloat(r.total_amount || 0), 0);
 
   return (
-    <div style={S.overlay}>
-      <div style={S.modal}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #1a1a1a' }}>
-          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 22, fontWeight: 900, color: 'white', textTransform: 'uppercase' }}>Add {type} Payroll</div>
-          <button onClick={onClose} style={{ background: '#1a1a1a', border: '1px solid #222', color: '#a1a1aa', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 5 }}><X size={13} /></button>
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <div>
+          <label style={S.label}>Filter by Date</label>
+          <input type="date" style={S.input} value={dateFilter} onChange={e => setDate(e.target.value)} />
         </div>
-        <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-
-            {type === 'supervisor' && (
-              <div style={{ gridColumn: '1/-1' }}>
-                <label style={S.label}>Supervisor *</label>
-                <select style={S.select} required value={form.supervisor || ''} onChange={e => setForm({ ...form, supervisor: e.target.value })}>
-                  <option value="">— Select —</option>
-                  {supervisors.map(s => <option key={s.id} value={s.id}>{s.first_name} {s.last_name || s.username}</option>)}
-                </select>
-              </div>
-            )}
-
-            {type === 'contractor' && (
-              <div style={{ gridColumn: '1/-1' }}>
-                <label style={S.label}>Contractor *</label>
-                <select style={S.select} required value={form.contractor || ''} onChange={e => setForm({ ...form, contractor: e.target.value })}>
-                  <option value="">— Select —</option>
-                  {contractors.map(c => <option key={c.id} value={c.id}>{getName(c)}</option>)}
-                </select>
-              </div>
-            )}
-
-            {type === 'labourer' && (
-              <>
-                <div>
-                  <label style={S.label}>Fixed Labourer</label>
-                  <select style={S.select} value={form.labourer || ''} onChange={e => setForm({ ...form, labourer: e.target.value, temp_labourer: '' })}>
-                    <option value="">— Select —</option>
-                    {labourers.map(l => <option key={l.id} value={l.id}>{getName(l)}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={S.label}>Or Temp Labourer</label>
-                  <select style={S.select} value={form.temp_labourer || ''} onChange={e => setForm({ ...form, temp_labourer: e.target.value, labourer: '' })}>
-                    <option value="">— Select —</option>
-                    {tempLabs.map(t => <option key={t.id} value={t.id}>{t.name} (Temp)</option>)}
-                  </select>
-                </div>
-              </>
-            )}
-
-            <div style={{ gridColumn: '1/-1' }}>
-              <label style={S.label}>Project *</label>
-              <select style={S.select} required value={form.project || ''} onChange={e => setForm({ ...form, project: e.target.value, period: '' })}>
-                <option value="">— Select —</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-
-            {/* FIX: Period is REQUIRED for ContractorPayroll (unique_together constraint) */}
-            {type === 'contractor' && (
-              <div style={{ gridColumn: '1/-1' }}>
-                <label style={S.label}>Period * <span style={{ color: '#52525b', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(select project first)</span></label>
-                <select style={S.select} required value={form.period || ''} onChange={e => setForm({ ...form, period: e.target.value })}
-                  disabled={!form.project || periods.length === 0}>
-                  <option value="">— Select Period —</option>
-                  {periods.map(p => <option key={p.id} value={p.id}>{p.name} ({p.start_date} → {p.end_date})</option>)}
-                </select>
-                {form.project && periods.length === 0 && (
-                  <div style={{ fontSize: 11, color: '#f87171', marginTop: 6 }}>
-                    No periods found for this project. Create a period first via the Django admin or Periods API.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {type === 'supervisor' && (<>
-              <div>
-                <label style={S.label}>Month *</label>
-                <input type="date" style={S.input} required value={form.month || ''} onChange={e => setForm({ ...form, month: e.target.value })} />
-              </div>
-              <div>
-                <label style={S.label}>Monthly Salary (₹) *</label>
-                <input type="number" style={S.input} required min="0" value={form.monthly_salary || ''} onChange={e => setForm({ ...form, monthly_salary: e.target.value })} />
-              </div>
-              <div>
-                <label style={S.label}>Bonus (₹)</label>
-                <input type="number" style={S.input} min="0" value={form.bonus || '0'} onChange={e => setForm({ ...form, bonus: e.target.value })} />
-              </div>
-              <div>
-                <label style={S.label}>Deductions (₹)</label>
-                <input type="number" style={S.input} min="0" value={form.deductions || '0'} onChange={e => setForm({ ...form, deductions: e.target.value })} />
-              </div>
-            </>)}
-
-            {type === 'contractor' && (<>
-              <div>
-                <label style={S.label}>Project Amount (₹) *</label>
-                <input type="number" style={S.input} required min="0" value={form.project_amount || ''} onChange={e => setForm({ ...form, project_amount: e.target.value })} />
-              </div>
-              <div>
-                <label style={S.label}>Advance Paid (₹)</label>
-                <input type="number" style={S.input} min="0" value={form.advance_paid || '0'} onChange={e => setForm({ ...form, advance_paid: e.target.value })} />
-              </div>
-              <div>
-                <label style={S.label}>Deductions (₹)</label>
-                <input type="number" style={S.input} min="0" value={form.deductions || '0'} onChange={e => setForm({ ...form, deductions: e.target.value })} />
-              </div>
-            </>)}
-
-            {type === 'labourer' && (<>
-              <div>
-                <label style={S.label}>Start Date *</label>
-                <input type="date" style={S.input} required value={form.start_date || ''} onChange={e => setForm({ ...form, start_date: e.target.value })} />
-              </div>
-              <div>
-                <label style={S.label}>End Date *</label>
-                <input type="date" style={S.input} required value={form.end_date || ''} onChange={e => setForm({ ...form, end_date: e.target.value })} />
-              </div>
-              <div>
-                <label style={S.label}>Daily Wage (₹)</label>
-                <input type="number" style={S.input} min="0" value={form.daily_wage || '0'} onChange={e => setForm({ ...form, daily_wage: e.target.value })} />
-              </div>
-              <div>
-                <label style={S.label}>OT Rate (₹/hr)</label>
-                <input type="number" style={S.input} min="0" value={form.overtime_rate || '0'} onChange={e => setForm({ ...form, overtime_rate: e.target.value })} />
-              </div>
-              <div>
-                <label style={S.label}>Deductions (₹)</label>
-                <input type="number" style={S.input} min="0" value={form.deductions || '0'} onChange={e => setForm({ ...form, deductions: e.target.value })} />
-              </div>
-            </>)}
-          </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button type="submit" style={S.btn}>Save Payroll</button>
-            <button type="button" style={S.btnGhost} onClick={onClose}>Cancel</button>
-          </div>
-        </form>
+        <div>
+          <label style={S.label}>Filter by Project</label>
+          <select style={S.select} value={projectFilter} onChange={e => setProject(e.target.value)}>
+            <option value="">All Projects</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
       </div>
-    </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <span style={{ fontSize: 13, color: '#a1a1aa', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 2, textTransform: 'uppercase' }}>
+          {records.length} records · ₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+        </span>
+        <button style={S.btnGhost} onClick={load}><RefreshCw size={11} />Refresh</button>
+      </div>
+
+      {loading ? <Loader /> : records.length === 0 ? (
+        <Empty msg="No labourer payroll records yet. Mark attendance to auto-generate." />
+      ) : (
+        <div style={{ ...S.card, overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+            <thead>
+              <tr style={{ background: '#0a0a0a', borderBottom: '1px solid #1a1a1a' }}>
+                {['Date', 'Worker', 'Contractor', 'Project', 'Daily Wage', 'OT Hrs', 'Total', 'Attendance', 'Status'].map(h => (
+                  <th key={h} style={S.th}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((r, i) => {
+                const bg    = i % 2 === 0 ? '#0d0d0d' : '#0a0a0a';
+                const otPay = parseFloat(r.overtime_hours || 0) * parseFloat(r.overtime_rate || 0);
+                return (
+                  <tr key={r.id} className="pr-row">
+                    <td style={{ ...S.td, background: bg, fontFamily: "'Barlow Condensed',sans-serif", color: 'white', fontWeight: 700, whiteSpace: 'nowrap' }}>{r.date}</td>
+                    <td style={{ ...S.td, background: bg }}>
+                      <div style={{ fontWeight: 600, color: 'white', fontSize: 13 }}>{r.labourer_name}</div>
+                      {r.is_temp && <span style={{ fontSize: 13, color: '#facc15', display: 'block', marginTop: 2 }}>TEMP</span>}
+                    </td>
+                    <td style={{ ...S.td, background: bg }}>{r.contractor_name || '—'}</td>
+                    <td style={{ ...S.td, background: bg }}>{r.project_name}</td>
+                    <td style={{ ...S.td, background: bg }}>₹{Number(r.daily_wage).toLocaleString('en-IN')}</td>
+                    <td style={{ ...S.td, background: bg }}>{parseFloat(r.overtime_hours || 0).toFixed(1)}h</td>
+                    <td style={{ ...S.td, background: bg, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 17, fontWeight: 900, color: '#4ade80', whiteSpace: 'nowrap' }}>
+                      ₹{Number(r.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ ...S.td, background: bg }}>
+                      <span style={{ fontSize: 12, color: '#a1a1aa', background: '#111', padding: '2px 8px', letterSpacing: 1 }}>{r.attendance_status}</span>
+                    </td>
+                    <td style={{ ...S.td, background: bg }}><StatusBadge status={r.status} /></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   );
 }

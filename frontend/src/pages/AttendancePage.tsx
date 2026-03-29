@@ -14,7 +14,7 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }
   ABSENT:   { color: '#f87171', bg: 'rgba(248,113,113,0.12)', label: 'Absent'   },
   HALF_DAY: { color: '#facc15', bg: 'rgba(250,204,21,0.12)',  label: 'Half Day' },
   LEAVE:    { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  label: 'Leave'    },
-  UNMARKED: { color: '#52525b', bg: 'rgba(82,82,91,0.12)',    label: 'Unmarked' },
+  UNMARKED: { color: '#a1a1aa', bg: 'rgba(82,82,91,0.12)',    label: 'Unmarked' },
 };
 const STATUSES = ['PRESENT', 'ABSENT', 'HALF_DAY', 'LEAVE'] as const;
 
@@ -38,7 +38,7 @@ const ColorBar = ({
   summary, onClick, height = 10,
 }: { summary: AttendanceSummary; onClick?: () => void; height?: number }) => {
   const { total, present, absent, half_day, leave, unmarked } = summary;
-  if (!total) return <div style={{ fontSize: 11, color: '#3f3f46' }}>No members</div>;
+  if (!total) return <div style={{ fontSize: 13, color: '#71717a' }}>No members</div>;
 
   const pct = (n: number) => `${((n / total) * 100).toFixed(1)}%`;
   const segments = [
@@ -74,12 +74,12 @@ const ColorBar = ({
       </div>
       <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
         {legend.map(x => (
-          <span key={x.k} style={{ fontSize: 10, color: x.c, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span key={x.k} style={{ fontSize: 12, color: x.c, display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 6, height: 6, background: x.c, borderRadius: '50%', display: 'inline-block' }} />
             {x.l}: {x.v}
           </span>
         ))}
-        <span style={{ fontSize: 10, color: '#3f3f46', marginLeft: 'auto' }}>{total} total</span>
+        <span style={{ fontSize: 12, color: '#71717a', marginLeft: 'auto' }}>{total} total</span>
       </div>
     </div>
   );
@@ -109,7 +109,7 @@ const DetailModal = ({
       {/* Status legend */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-          <span key={k} style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: v.color, background: v.bg, padding: '3px 8px', borderRadius: 8, textTransform: 'uppercase', fontFamily: "'Barlow Condensed',sans-serif" }}>
+          <span key={k} style={{ fontSize: 13, fontWeight: 700, letterSpacing: 2, color: v.color, background: v.bg, padding: '3px 8px', borderRadius: 8, textTransform: 'uppercase', fontFamily: "'Barlow Condensed',sans-serif" }}>
             {v.label}
           </span>
         ))}
@@ -127,12 +127,12 @@ const DetailModal = ({
             }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>{p.name}</div>
-                {p.company    && <div style={{ fontSize: 11, color: '#71717a' }}>{p.company}</div>}
-                {p.contractor && <div style={{ fontSize: 11, color: '#52525b' }}>under {p.contractor}</div>}
-                {p.daily_wage && <div style={{ fontSize: 10, color: '#52525b' }}>₹{p.daily_wage}/day</div>}
+                {p.company    && <div style={{ fontSize: 13, color: '#71717a' }}>{p.company}</div>}
+                {p.contractor && <div style={{ fontSize: 13, color: '#a1a1aa' }}>under {p.contractor}</div>}
+                {p.daily_wage && <div style={{ fontSize: 12, color: '#a1a1aa' }}>₹{p.daily_wage}/day</div>}
               </div>
               <span style={{
-                fontSize: 9, fontWeight: 700, letterSpacing: 2, color: conf.color,
+                fontSize: 13, fontWeight: 700, letterSpacing: 2, color: conf.color,
                 background: `${conf.color}15`, padding: '3px 10px', borderRadius: 8,
                 fontFamily: "'Barlow Condensed',sans-serif", textTransform: 'uppercase',
               }}>
@@ -154,7 +154,7 @@ const StatusBtn = ({
   const active = current === value;
   return (
     <button onClick={() => onChange(value)} style={{
-      padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 10,
+      padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
       fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, letterSpacing: 2,
       textTransform: 'uppercase', transition: 'all 0.15s',
       background: active ? conf.bg    : 'transparent',
@@ -185,7 +185,7 @@ const AddTempModal = ({
           { key: 'daily_wage', label: 'Daily Wage (₹) *',  type: 'number' },
         ].map(f => (
           <div key={f.key} style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 9, letterSpacing: 3, textTransform: 'uppercase', color: '#3f3f46', fontWeight: 600, marginBottom: 8 }}>{f.label}</label>
+            <label style={{ display: 'block', fontSize: 13, letterSpacing: 2, textTransform: 'uppercase', color: '#a1a1aa', fontWeight: 600, marginBottom: 8 }}>{f.label}</label>
             <input
               type={f.type} value={(form as any)[f.key]}
               onChange={e => setForm({ ...form, [f.key]: e.target.value })}
@@ -195,7 +195,7 @@ const AddTempModal = ({
         ))}
         <button
           onClick={() => { if (form.name && form.daily_wage) { onAdd(form); onClose(); } }}
-          style={{ width: '100%', background: '#dc2626', color: 'white', border: 'none', padding: 13, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', cursor: 'pointer' }}
+          style={{ width: '100%', background: '#dc2626', color: 'white', border: 'none', padding: 13, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', cursor: 'pointer' }}
         >
           Add Labourer
         </button>
@@ -211,8 +211,8 @@ const inputStyle: React.CSSProperties = {
   fontFamily: "'Inter',sans-serif", cursor: 'pointer', width: '100%', boxSizing: 'border-box',
 };
 const tableHead: React.CSSProperties = {
-  background: '#111', padding: '10px 14px', fontSize: 9, letterSpacing: 3,
-  textTransform: 'uppercase', color: '#3f3f46', fontWeight: 700, textAlign: 'left',
+  background: '#111', padding: '10px 14px', fontSize: 13, letterSpacing: 2,
+  textTransform: 'uppercase', color: '#a1a1aa', fontWeight: 700, textAlign: 'left',
 };
 const tableCell: React.CSSProperties = {
   padding: '12px 14px', fontSize: 13, color: 'white', borderTop: '1px solid #111',
@@ -226,8 +226,8 @@ function HRMonitorView({
   loading: boolean;
   onOpenModal: (title: string, details: PersonDetail[]) => void;
 }) {
-  if (loading) return <div style={{ padding: 60, textAlign: 'center', color: '#3f3f46' }}>Loading monitor data…</div>;
-  if (!monitorData.length) return <div style={{ padding: 60, textAlign: 'center', color: '#3f3f46', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 4, textTransform: 'uppercase', fontSize: 13 }}>No active projects</div>;
+  if (loading) return <div style={{ padding: 60, textAlign: 'center', color: '#71717a' }}>Loading monitor data…</div>;
+  if (!monitorData.length) return <div style={{ padding: 60, textAlign: 'center', color: '#71717a', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 4, textTransform: 'uppercase', fontSize: 13 }}>No active projects</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -236,17 +236,17 @@ function HRMonitorView({
           <div style={{ padding: '16px 20px', borderBottom: '1px solid #111', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 20, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>{proj.project_name}</div>
-              <div style={{ fontSize: 11, color: '#71717a', marginTop: 2 }}>Supervisor: <span style={{ color: '#a1a1aa' }}>{proj.supervisor_name}</span></div>
+              <div style={{ fontSize: 13, color: '#71717a', marginTop: 2 }}>Supervisor: <span style={{ color: '#a1a1aa' }}>{proj.supervisor_name}</span></div>
             </div>
-            <div style={{ fontSize: 10, color: '#3f3f46' }}>{proj.date}</div>
+            <div style={{ fontSize: 12, color: '#71717a' }}>{proj.date}</div>
           </div>
 
           <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                 <Briefcase size={12} color="#facc15" />
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: '#facc15' }}>Contractors</span>
-                <button onClick={() => onOpenModal(`${proj.project_name} — Contractors`, proj.contractor_details)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#52525b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: '#facc15' }}>Contractors</span>
+                <button onClick={() => onOpenModal(`${proj.project_name} — Contractors`, proj.contractor_details)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }}>
                   <Info size={11} />Details
                 </button>
               </div>
@@ -256,8 +256,8 @@ function HRMonitorView({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                 <HardHat size={12} color="#4ade80" />
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: '#4ade80' }}>Labourers</span>
-                <button onClick={() => onOpenModal(`${proj.project_name} — Labourers`, proj.labourer_details)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#52525b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: '#4ade80' }}>Labourers</span>
+                <button onClick={() => onOpenModal(`${proj.project_name} — Labourers`, proj.labourer_details)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }}>
                   <Info size={11} />Details
                 </button>
               </div>
@@ -500,12 +500,12 @@ export default function AttendancePage() {
           ? <Briefcase size={12} color="#facc15" />
           : <HardHat size={12} color="#4ade80" />
         }
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: type === 'contractor' ? '#facc15' : '#4ade80' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: type === 'contractor' ? '#facc15' : '#4ade80' }}>
           Today's Status
         </span>
         <button
           onClick={onDetail}
-          style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#52525b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}
+          style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }}
         >
           <Info size={11} />View Detail
         </button>
@@ -528,7 +528,7 @@ export default function AttendancePage() {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 28, paddingBottom: 20, borderBottom: '1px solid #161616', position: 'relative' }}>
           <div style={{ position: 'absolute', bottom: -1, left: 0, width: 64, height: 3, background: '#dc2626', borderRadius: 2 }} />
           <div>
-            <div style={{ fontSize: 10, letterSpacing: 4, textTransform: 'uppercase', color: '#71717a', marginBottom: 6, fontWeight: 600 }}>Daily Record</div>
+            <div style={{ fontSize: 12, letterSpacing: 2, textTransform: 'uppercase', color: '#71717a', marginBottom: 6, fontWeight: 600 }}>Daily Record</div>
             <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 44, fontWeight: 900, textTransform: 'uppercase', letterSpacing: -1, lineHeight: 1 }}>Attendance</div>
           </div>
         </div>
@@ -536,7 +536,7 @@ export default function AttendancePage() {
         {/* ── Controls ── */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Calendar size={14} style={{ position: 'absolute', left: 12, color: '#52525b', pointerEvents: 'none' }} />
+            <Calendar size={14} style={{ position: 'absolute', left: 12, color: '#a1a1aa', pointerEvents: 'none' }} />
             <input
               type="date" value={selDate} onChange={e => setSelDate(e.target.value)}
               className="att-sel"
@@ -557,7 +557,7 @@ export default function AttendancePage() {
           {role === 'HR' && (
             <button
               onClick={loadMonitor}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#141414', color: '#a1a1aa', border: '1px solid #1e1e1e', padding: '10px 18px', cursor: 'pointer', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#141414', color: '#d4d4d8', border: '1px solid #3f3f46', padding: '10px 18px', cursor: 'pointer', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase' }}
             >
               <RefreshCw size={13} />Refresh
             </button>
@@ -588,7 +588,7 @@ export default function AttendancePage() {
             )}
 
             {loading ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#3f3f46' }}>Loading…</div>
+              <div style={{ padding: 40, textAlign: 'center', color: '#71717a' }}>Loading…</div>
             ) : (
               <div style={{ background: '#0d0d0d', border: '1px solid #161616', borderRadius: 10, overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -601,7 +601,7 @@ export default function AttendancePage() {
                   </thead>
                   <tbody>
                     {contractorList.length === 0 ? (
-                      <tr><td colSpan={3} style={{ padding: 40, textAlign: 'center', color: '#3f3f46', fontSize: 13 }}>No contractors found for this project.</td></tr>
+                      <tr><td colSpan={3} style={{ padding: 40, textAlign: 'center', color: '#71717a', fontSize: 13 }}>No contractors found for this project.</td></tr>
                     ) : contractorList.map((c: any) => (
                       <tr key={c.contractor} className="att-row">
                         <td style={tableCell}>{c.contractor_name || `#${c.contractor}`}</td>
@@ -626,7 +626,7 @@ export default function AttendancePage() {
                   <div style={{ padding: '14px 20px', borderTop: '1px solid #111', display: 'flex', justifyContent: 'flex-end' }}>
                     <button
                       onClick={saveContractorAtt} disabled={saving}
-                      style={{ background: '#dc2626', color: 'white', border: 'none', padding: '11px 28px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+                      style={{ background: '#dc2626', color: 'white', border: 'none', padding: '11px 28px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
                     >
                       {saving ? 'Saving…' : 'Save Attendance'}
                     </button>
@@ -653,13 +653,13 @@ export default function AttendancePage() {
             ].map(section => section.items.length > 0 && (
               <div key={section.label} style={{ background: '#0d0d0d', border: '1px solid #161616', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
                 <div style={{ padding: '14px 20px', borderBottom: '1px solid #111', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: section.kp === 't' ? '#facc15' : '#4ade80' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', color: section.kp === 't' ? '#facc15' : '#4ade80' }}>
                     {section.label} ({section.items.length})
                   </span>
                   {section.kp === 't' && (
                     <button
                       onClick={() => setShowTempModal(true)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(74,222,128,0.08)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.25)', padding: '5px 12px', cursor: 'pointer', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', borderRadius: 6 }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(74,222,128,0.08)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.25)', padding: '5px 12px', cursor: 'pointer', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', borderRadius: 6 }}
                     >
                       <Plus size={11} />Add Temp
                     </button>
@@ -716,13 +716,13 @@ export default function AttendancePage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                 <button
                   onClick={() => setShowTempModal(true)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', color: '#4ade80', border: '1px solid rgba(74,222,128,0.3)', padding: '11px 20px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', cursor: 'pointer' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', color: '#4ade80', border: '1px solid rgba(74,222,128,0.3)', padding: '11px 20px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', cursor: 'pointer' }}
                 >
                   <Plus size={12} />Add Temp Labourer
                 </button>
                 <button
                   onClick={saveLabourerAtt} disabled={saving}
-                  style={{ background: '#dc2626', color: 'white', border: 'none', padding: '11px 28px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+                  style={{ background: '#dc2626', color: 'white', border: 'none', padding: '11px 28px', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
                 >
                   {saving ? 'Saving…' : 'Save Attendance'}
                 </button>
@@ -730,12 +730,12 @@ export default function AttendancePage() {
             )}
 
             {fixedLabs.length === 0 && tempLabs.length === 0 && !loading && projectId && (
-              <div style={{ padding: 60, textAlign: 'center', color: '#3f3f46', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 4, textTransform: 'uppercase', fontSize: 13 }}>
+              <div style={{ padding: 60, textAlign: 'center', color: '#71717a', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 4, textTransform: 'uppercase', fontSize: 13 }}>
                 No labourers assigned.
                 <div style={{ marginTop: 16 }}>
                   <button
                     onClick={() => setShowTempModal(true)}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(74,222,128,0.08)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.25)', padding: '10px 20px', cursor: 'pointer', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase' }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(74,222,128,0.08)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.25)', padding: '10px 20px', cursor: 'pointer', fontFamily: "'Barlow Condensed',sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase' }}
                   >
                     <Plus size={12} />Add Temp Labourer
                   </button>
@@ -747,7 +747,7 @@ export default function AttendancePage() {
 
         {/* Prompt to select project */}
         {role !== 'HR' && !projectId && (
-          <div style={{ padding: 60, textAlign: 'center', color: '#3f3f46', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 4, textTransform: 'uppercase', fontSize: 13 }}>
+          <div style={{ padding: 60, textAlign: 'center', color: '#71717a', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 4, textTransform: 'uppercase', fontSize: 13 }}>
             Select a project above to view and mark attendance.
           </div>
         )}

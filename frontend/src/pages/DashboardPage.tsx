@@ -81,7 +81,7 @@ const DashboardPage = () => {
         .dash-header::after { content:''; position:absolute; bottom:-1px; left:0; width:64px; height:3px; background:#dc2626; }
 
         /* ✅ Greeting visible */
-        .dash-greeting { font-size:11px; letter-spacing:4px; text-transform:uppercase; color:#a1a1aa; margin-bottom:8px; font-weight:600; }
+        .dash-greeting { font-size:13px; letter-spacing:4px; text-transform:uppercase; color:#a1a1aa; margin-bottom:8px; font-weight:600; }
 
         .dash-title { font-family:'Barlow Condensed',sans-serif; font-size:56px; font-weight:900; color:white; text-transform:uppercase; letter-spacing:-2px; line-height:1; }
         .dash-title em { font-style:normal; color:#dc2626; }
@@ -89,7 +89,7 @@ const DashboardPage = () => {
         .dash-clock { font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:700; color:white; letter-spacing:-1px; line-height:1; }
 
         /* ✅ Date visible */
-        .dash-date { font-size:11px; color:#a1a1aa; letter-spacing:2px; text-transform:uppercase; margin-top:4px; }
+        .dash-date { font-size:13px; color:#a1a1aa; letter-spacing:2px; text-transform:uppercase; margin-top:4px; }
 
         .dash-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:2px; margin-bottom:40px; }
         .dash-stat { background:#0d0d0d; border:1px solid #1e1e1e; padding:28px 24px; position:relative; overflow:hidden; transition:all 0.2s; cursor:default; }
@@ -101,7 +101,7 @@ const DashboardPage = () => {
         .dash-stat-icon { width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.05); border:1px solid #2a2a2a; margin-bottom:20px; }
 
         /* ✅ Card labels visible */
-        .dash-stat-label { font-family:'Barlow Condensed',sans-serif; font-size:10px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:#a1a1aa; margin-bottom:10px; }
+        .dash-stat-label { font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:#a1a1aa; margin-bottom:10px; }
 
         .dash-stat-value { font-family:'Barlow Condensed',sans-serif; font-size:56px; font-weight:900; color:white; line-height:1; letter-spacing:-2px; }
 
@@ -115,13 +115,13 @@ const DashboardPage = () => {
         .dash-info-card { background:#0d0d0d; border:1px solid #1e1e1e; padding:24px; }
 
         /* ✅ Info card titles visible */
-        .dash-info-card-title { font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:#a1a1aa; margin-bottom:16px; }
+        .dash-info-card-title { font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:#a1a1aa; margin-bottom:16px; }
 
         .dash-info-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #1a1a1a; font-size:13px; color:#a1a1aa; }
         .dash-info-row:last-child { border-bottom:none; }
         .dash-info-row strong { color:white; font-weight:600; }
 
-        .dash-role-badge { display:inline-block; padding:2px 10px; font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; background:rgba(220,38,38,0.1); color:#f87171; }
+        .dash-role-badge { display:inline-block; padding:2px 10px; font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; letter-spacing:2px; text-transform:uppercase; background:rgba(220,38,38,0.1); color:#f87171; }
 
         .dash-loading { display:flex; align-items:center; gap:14px; padding:80px 40px; color:#a1a1aa; font-family:'Barlow Condensed',sans-serif; font-size:14px; letter-spacing:3px; text-transform:uppercase; }
         .dash-loading-bar { width:48px; height:2px; background:#1e1e1e; position:relative; overflow:hidden; }
