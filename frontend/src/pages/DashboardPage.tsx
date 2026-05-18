@@ -37,14 +37,19 @@ const DashboardPage = () => {
             apiClient.get('/payroll/contractor/'),
             apiClient.get('/payroll/labourer/'),
           ]);
-          const allPayrolls = [
-            ...extractResults<any>(supPay.data),
-            ...extractResults<any>(conPay.data),
-            ...extractResults<any>(labPay.data),
-          ];
-          pending    = allPayrolls.filter(p => p.status === 'PENDING').length;
-          approved   = allPayrolls.filter(p => p.status === 'APPROVED').length;
-          totalWages = allPayrolls.reduce((s, p) => s + parseFloat(p.total_amount || 0), 0);
+          const supPayrolls = extractResults<any>(supPay.data);
+          const conPayrolls = extractResults<any>(conPay.data);
+          const labPayrolls = extractResults<any>(labPay.data);
+          const allPayrolls = [...supPayrolls, ...conPayrolls, ...labPayrolls];
+
+          pending  = allPayrolls.filter(p => p.status === 'PENDING').length;
+          approved = allPayrolls.filter(p => p.status === 'APPROVED').length;
+
+          // Total Wages = supervisor salaries + contractor project funds
+          // Labourer wages are paid by contractors FROM their fund — not added separately
+          const supTotal = supPayrolls.reduce((s: number, p: any) => s + parseFloat(p.total_amount || 0), 0);
+          const conTotal = conPayrolls.reduce((s: number, p: any) => s + parseFloat(p.project_amount || p.total_amount || 0), 0);
+          totalWages = supTotal + conTotal;
         } catch (e) { console.warn('Payroll fetch partial error:', e); }
 
         try {
@@ -80,15 +85,12 @@ const DashboardPage = () => {
         .dash-header { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:40px; padding-bottom:28px; border-bottom:1px solid #2a2a2a; position:relative; }
         .dash-header::after { content:''; position:absolute; bottom:-1px; left:0; width:64px; height:3px; background:#dc2626; }
 
-        /* ✅ Greeting visible */
         .dash-greeting { font-size:13px; letter-spacing:4px; text-transform:uppercase; color:#a1a1aa; margin-bottom:8px; font-weight:600; }
 
         .dash-title { font-family:'Barlow Condensed',sans-serif; font-size:56px; font-weight:900; color:white; text-transform:uppercase; letter-spacing:-2px; line-height:1; }
         .dash-title em { font-style:normal; color:#dc2626; }
 
         .dash-clock { font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:700; color:white; letter-spacing:-1px; line-height:1; }
-
-        /* ✅ Date visible */
         .dash-date { font-size:13px; color:#a1a1aa; letter-spacing:2px; text-transform:uppercase; margin-top:4px; }
 
         .dash-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:2px; margin-bottom:40px; }
@@ -99,24 +101,16 @@ const DashboardPage = () => {
 
         .dash-stat-ghost { position:absolute; right:-10px; bottom:-20px; font-family:'Barlow Condensed',sans-serif; font-size:100px; font-weight:900; color:rgba(255,255,255,0.03); line-height:1; pointer-events:none; user-select:none; }
         .dash-stat-icon { width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.05); border:1px solid #2a2a2a; margin-bottom:20px; }
-
-        /* ✅ Card labels visible */
         .dash-stat-label { font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:#a1a1aa; margin-bottom:10px; }
-
         .dash-stat-value { font-family:'Barlow Condensed',sans-serif; font-size:56px; font-weight:900; color:white; line-height:1; letter-spacing:-2px; }
 
         .dash-section-head { display:flex; align-items:center; gap:14px; margin-bottom:20px; }
         .dash-section-line { width:32px; height:2px; background:#dc2626; }
-
-        /* ✅ Section title visible */
         .dash-section-title { font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:#a1a1aa; }
 
         .dash-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
         .dash-info-card { background:#0d0d0d; border:1px solid #1e1e1e; padding:24px; }
-
-        /* ✅ Info card titles visible */
         .dash-info-card-title { font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:#a1a1aa; margin-bottom:16px; }
-
         .dash-info-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #1a1a1a; font-size:13px; color:#a1a1aa; }
         .dash-info-row:last-child { border-bottom:none; }
         .dash-info-row strong { color:white; font-weight:600; }

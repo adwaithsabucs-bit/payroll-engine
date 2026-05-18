@@ -15,6 +15,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'email', 'role', 'phone',
             'first_name', 'last_name', 'company_name',
+            'monthly_salary',          # ← added
             'pin_is_set', 'created_at',
         ]
         read_only_fields = ['id', 'pin_is_set', 'created_at']
@@ -29,6 +30,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = [
             'username', 'email', 'password', 'password2', 'role',
             'first_name', 'last_name', 'phone', 'company_name',
+            'monthly_salary',          # ← added so create works too
         ]
 
     def validate(self, data):
@@ -129,32 +131,19 @@ class VerifyPINSerializer(serializers.Serializer):
 # ── Forgot PIN ────────────────────────────────────────────────────
 
 class ForgotPINSerializer(serializers.Serializer):
-    """
-    POST /auth/forgot-pin/ with {username}.
-    Generates a 6-digit reset code (plain stored on model for HR to relay),
-    hashed for verification, expires in 15 minutes.
-    """
     username = serializers.CharField()
 
     def validate_username(self, value):
         try:
             user = CustomUser.objects.get(username=value)
         except CustomUser.DoesNotExist:
-            raise serializers.ValidationError(
-                'No account found with that username.'
-            )
+            raise serializers.ValidationError('No account found with that username.')
         if not user.pin_is_set:
-            raise serializers.ValidationError(
-                'No PIN has been set for this account. Contact HR.'
-            )
+            raise serializers.ValidationError('No PIN has been set for this account. Contact HR.')
         return value
 
 
 class ResetPINWithCodeSerializer(serializers.Serializer):
-    """
-    POST /auth/reset-pin-with-code/
-    {username, reset_code, new_pin, confirm_pin}
-    """
     username    = serializers.CharField()
     reset_code  = serializers.CharField()
     new_pin     = serializers.CharField()
@@ -170,7 +159,6 @@ class ResetPINWithCodeSerializer(serializers.Serializer):
             raise serializers.ValidationError({'reset_code': 'No reset was requested for this account.'})
 
         if user.pin_reset_expires and user.pin_reset_expires < timezone.now():
-            # Clear expired code
             user.pin_reset_code    = ''
             user.pin_reset_expires = None
             user.save(update_fields=['pin_reset_code', 'pin_reset_expires'])
